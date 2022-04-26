@@ -13,10 +13,10 @@ The maturity of Computational Fluid Dynamics (CFD) and the variability of operat
 
 [J. Peter, S. Görtz, R. E. Graves. Three-parameter uncertainty quantification for generic missile FG5. AIAA Paper \#2017-1197 (2017).](https://doi.org/10.2514/6.2017-1197)
 
-[É. Savin, A. Resmini, J. Peter. Sparse polynomial surrogates for aerodynamic computations with random inputs. AIAA Paper \#2016-0433 (2016).](https://doi.org/10.2514/6.2016-0433)
+[É. Savin, A. Resmini, J. Peter. Sparse polynomial surrogates for aerodynamic computations with random inputs. AIAA Paper \#2016-0433 (2016);](https://doi.org/10.2514/6.2016-0433) [arXiv:1506.02318.](https://arxiv.org/abs/1506.02318)
 
 [É. Savin, B. Faverjon. Higher-order moments of generalized polynomial chaos expansions for intrusive and non-intrusive uncertainty quantification. AIAA Paper \#2017-0597 (2017);](https://doi.org/10.2514/6.2017-0597) [arXiv:1607.01914.](https://arxiv.org/abs/1607.01914)
 
 [É. Savin, B. Faverjon. Computation of higher-order moments of generalized polynomial chaos expansions. *Int. J. Num. Methods Engng.* __111__(12), 1192-1200 (2017).](https://doi.org/10.1002/nme.5505)
 
-[É. Savin, J.-L. Hantrais-Gervois. Sparse polynomial surrogates for non-intrusive, high-dimensional uncertainty quantification of aeroelastic computations. *Prob. Engng. Mech.* __59__, 103027 (2020).](https://doi.org/10.1016/j.probengmech.2020.103027)
+[É. Savin, J.-L. Hantrais-Gervois. Sparse polynomial surrogates for non-intrusive, high-dimensional uncertainty quantification of aeroelastic computations. *Prob. Engng. Mech.* __59__, 103027 (2020);](https://doi.org/10.1016/j.probengmech.2020.103027) [hal:02865271.](https://hal.archives-ouvertes.fr/hal-02865271)
