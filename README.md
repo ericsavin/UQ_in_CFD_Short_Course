@@ -11,7 +11,7 @@ The maturity of Computational Fluid Dynamics (CFD) and the variability of operat
 
 ## SOME REFERENCES
 
-[J. Peter, S. Görtz, R. E. Graves. Three-parameter uncertainty quantification for generic missile FG5. AIAA Paper \#2017-1197 (2017)](https://doi.org/10.2514/6.2017-1197)
+[J. Peter, S. Görtz, R. E. Graves. Three-parameter uncertainty quantification for generic missile FG5. AIAA Paper \#2017-1197 (2017).](https://doi.org/10.2514/6.2017-1197)
 
 [É. Savin, A. Resmini, J. Peter. Sparse polynomial surrogates for aerodynamic computations with random inputs. AIAA Paper \#2016-0433 (2016).](https://doi.org/10.2514/6.2016-0433)
 
