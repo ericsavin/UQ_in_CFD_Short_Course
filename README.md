@@ -7,7 +7,7 @@ Generalized polynomial chaos and stochastic collocation methods for uncertainty 
 The maturity of Computational Fluid Dynamics (CFD) and the variability of operational and geometrical parameters in fluid dynamics analysis and design lead to the development of Uncertainty Quantification (UQ). Among the numerous methods for UQ, these lecture notes describe the main features of Monte-Carlo and metamodel-based Monte-Carlo, __generalized polynomial chaos__, and __stochastic collocation__. The broadly used __sparse grid quadrature__ method of Smolyak is then outlined. Lastly some concepts of variance analysis are introduced. Two applications of UQ to 2D and 3D RANS flows, that have been carried out at [ONERA](http://www.onera.fr), are finally presented.
 
 * contact : [Éric Savin](mailto:eric.savin@onera.fr)
-* contributors (by order of first commit): J. Peter, É. Savin
+* contributors (by order of first commit): [J. Peter](mailto:jacques.peter@onera.fr), [É. Savin](mailto:eric.savin@onera.fr)
 
 ## SOME REFERENCES
 
