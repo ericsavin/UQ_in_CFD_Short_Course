@@ -1,0 +1,1400 @@
+% Sample use of nato-rto.cls from http://nato-rto-latex.googlecode.com
+%
+% Process with
+%
+%  pdflatex sample
+%  bibtex sample
+%  pdflatex sample
+%  pdflatex sample
+%
+% See README.txt for further information
+\def\webDOI{https://doi.org}
+\def\Onera{ONERA}
+\def\elsA{\emph{elsA}}
+\def\Python{Python}
+\def\FIGS{/Users/ericsavin/Documents/Cours/VKI-UQ-2018/LECTURE-NOTES-2018}
+\def\runtitle{Propagation des incertitudes en CFD}
+
+
+\title{M\'ethodes d'estimation d'erreur\\et propagation des incertitudes en CFD}
+
+\author{\large\bf Jacques Peter$^1$, \'Eric Savin$^2$\\[5pt]
+        $^1$\Onera/DAAA\\
+        Universit\'e Paris Saclay\\
+        29, avenue de la Division Leclerc \\
+        92322 Ch\^atillon cedex, France\\
+        \href{mailto:jacques.peter@onera.fr}{jacques.peter@onera.fr}\\[5pt]
+        $^2$\Onera/DTIS\\
+        Universit\'e Paris Saclay\\
+        8, chemin de la Huni\`ere\\
+        91123 Palaiseau cedex, France\\
+        \href{mailto:eric.savin@onera.fr}{eric.savin@onera.fr}}
+
+\documentclass{eurosae}
+\usepackage{amsfonts,amssymb,amsmath,amscd,amsthm}
+\usepackage{upgreek}
+\usepackage{subfigure}
+\usepackage{subfigmat}
+\usepackage{graphicx}
+\usepackage{pifont}
+\usepackage{enumitem}
+\usepackage{mathrsfs}
+\usepackage{bbm}
+\usepackage{dsfont}
+\usepackage{stmaryrd}
+%\usepackage[pdftex,pdfborderstyle={/S/U/W 1}]{hyperref}
+\usepackage{slashbox}
+
+\newtheorem{remark}{Remark}[section]
+
+
+\def\ds{\displaystyle}
+\def\vo{\vspace{1mm}}
+\def\vt{\vspace{2mm}}
+\def\vr{\vspace{3mm}}
+\def\vf{\vspace{4mm}}
+\def\vv{\vspace{5mm}}
+\def\vs{\vspace{7mm}}
+\def\ve{\vspace{11mm}}
+
+\def\scn{s}
+\def\bd{\mbox{\boldmath $d$}}
+\def\bm{\mbox{\boldmath $m$}}
+\def\bx{\mbox{\boldmath $x$}}
+\def\bms{\mbox{\scriptsize \bm}}
+\def\balpha{\boldsymbol \alpha}
+\def\bbeta{\boldsymbol \beta}
+\def\spaceU{\mathcal U_{\scn}}
+\def\spaceV{\mathcal V_{\scn}}
+\def\spacePU{\mathcal X}
+\def\spacePV{\mathcal Y}
+\def\begit{\begin{itemize}}
+\def\endit{\end{itemize}}
+\def\beas{\begin{eqnarray*}}
+\def\eeas{\end{eqnarray*}}
+\def\beq{\begin{equation}}
+\def\eeq{\end{equation}}
+\def\Ir{{\textrm I}}
+\newcommand{\xigj}{\xi}
+\newcommand{\xig}{{\boldsymbol\xi}}
+\newcommand{\nominal}[1]{\underline{#1}}
+\newcommand{\Nset}{{\mathbb N}}
+\newcommand{\Rset}{{\mathbb R}}
+\newcommand{\esp}{{\mathbb E}}
+\newcommand{\var}{\text{Var}}
+\newcommand{\iexp}{{\mathrm e}}
+\newcommand{\lift}{C_L}
+\newcommand{\drag}{C_D}
+\newcommand{\moment}{C_M}
+\newcommand{\Mach}{M}
+\newcommand{\PDFN}{{\mathcal N}}
+\newcommand{\PDFb}{\beta_{\mathrm I}}
+\newcommand{\mcoherence}{{\mathcal C}}
+
+\newcommand{\sref}[1]{Sect.~\ref{#1}}
+\newcommand{\eref}[1]{Eq.~(\ref{#1})}
+\newcommand{\fref}[1]{Fig.~\ref{#1}}
+\newcommand{\tref}[1]{Table~\ref{#1}}
+
+\newcommand{\Matlab}{Matlab$^\copyright$}
+
+% Please uncomment one of the following
+\papernumber{}
+ 
+\publicationreference{FMA-003 La simulation num\'erique en m\'ecanique des fluides compressibles}
+\classification{} 
+
+%************************************************************************************************
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The maturity of Computational Fluid Dynamics (CFD) and the variability of operational and geometrical parameters in fluid dynamics  analysis and design lead to the development of Uncertainty Quantification (UQ). Among the numerous methods for UQ, these lecture notes describe the main features of Monte-Carlo and metamodel-based Monte-Carlo in \sref{sec:MC}, generalized Polynomial Chaos in \sref{sec:gPC}, and Stochastic Collocation in \sref{sec:SC}. The broadly used sparse grid quadrature method of Smolyak \cite{Smo_63} is then presented \sref{sec:SGQ}. Lastly \sref{sec:Var} introduces some concepts of variance analysis. Two applications of UQ to 2D and 3D RANS flows, that have been carried out at \Onera, are finally outlined in \sref{sec:Examples}.
+\end{abstract}
+
+\tableofcontents
+
+%**********************************************************************************************
+\section{Introduction}
+%***********************************************************************
+%
+ For many applications of fluid dynamics, either in flow analysis or shape optimization,
+ operational or geometrical parameters of the problem may be subject to small variations. 
+ Cruise, for example, is known to be a flow condition of first importance for an aircraft and, in
+ first approximation, the cruise Mach number is known to be constant. Actually, it happens that 
+ an aircraft slows down to arrive at exact time of landing slot, or that it speeds 
+  up to cope with pilot maximum flight time. Mach number of cruise flight is hence subject
+ to small variations that can be modeled by a probability density function and 
+  cruise drag evaluation should integrate drag times this density function over the domain
+ of actual cruise Mach numbers.
+
+ The maturity of Computational Fluid Dynamics (CFD) and the variability of operational and geometrical parameters in fluid dynamics problems of analysis
+and design lead to the development of Uncertainty Quantification (UQ).
+ Most often the CFD methods for UQ aim at (1) calculating mean and variance
+ of outputs of interest; (2) predicting the range of an output under (a) stochastic parameter(s) variation;
+  (3) predicting the probability that an output exceeds a threshold.
+
+Among the numerous methods for UQ, these lecture notes describe the main features of Monte-Carlo and (non-specific) metamodel-based Monte-Carlo in \sref{sec:MC}; generalized Polynomial Chaos in \sref{sec:gPC}; and Stochastic Collocation in \sref{sec:SC}. The broadly used sparse grid quadrature method of Smolyak \cite{Smo_63} is then presented in \sref{sec:SGQ}. Analysis of variance is introduced in \sref{sec:Var}. Two applications of UQ to 2D and 3D Reynolds-Averaged Navier-Stokes (RANS) flows, that have been carried out at \Onera, are finally presented in \sref{sec:Examples}.
+%
+%**********************************************************************************************
+\section{Probability basics, Monte-Carlo, surrogate-based Monte-Carlo}\label{sec:MC}
+%********************************************************************************
+%
+%===================================================
+\subsection{Probability basics}
+%======================================
+%
+ The classical framework of probability spaces is a general mathematical structure that is suitable for both discrete and continuous stochastic
+ variables. A probability space consists of:
+\begit 
+\item a sample space $\Omega$ (dice values, interval of Mach number values) that is the set of all outcomes;
+\item a set of events space ${\cal A}$  ($\sigma$-algebra), consisting of elements of $\Omega$ or sets of elements of $\Omega$,
+ stable by union, intersection, and complementation relative to $\Omega$, including the null set $\emptyset$ and $\Omega$ itself (pair of dice values, set of even dice values... subinterval of Mach number values...);
+\item  The assignment of probabilities to the events of  ${\cal A}$ satisfying the intuitive rules for union and intersection.
+\endit
+%
+In a probability problem, the inputs are precisely the sample space, set of events and probability function of the events. The outputs
+ are random variable depending on the events. Typically, in UQ involving CFD, events are stochastic inputs of the flow simulation
+ like stochastically varying free-stream Mach number or angle of attack whereas random variables are classical
+ CFD outputs like $CDp$, $CLp$... or friction, pressure distribution at the walls... that depend on the stochastic inputs via the 
+ calculation of flow.
+\vt \\
+%
+\noindent\underline{ Discrete example}: fair 6-face dice thrown once 
+\begit
+\item event: $\xi = 1,2,3,4,5$ or $6$;
+\item sample space: $\Omega =\{1,2,3,4,5,6\}$;
+\item set of events ($\sigma$-algebra): null set plus all discrete sets of these numbers,\footnote{The sets ${\cal F}=\{\emptyset,\{2,4,6\},\{1,3,5\},\Omega\}$, ${\cal F}=\{\emptyset,\{2,5\},\{1,3,4,6\},\Omega\}$... are also suitable $\sigma$-algebras.} ${\cal F}=2^\Omega=\{\emptyset,\{1\},\{2\},\{3\},\{4\}$, $\{5\},\{6\},\{1,2\},\{1,3\},\{1,4\},\{1,5\},\{1,6\},\{2,3\},\{2,4\},\{2,5\},\dots\{1,2,3,4,5,6\}\}$;
+\item probability function $P$: $P(\emptyset)= 0,P(\{1\})= 1/6,P(\{2\})=1/6,\dots P(\{1,2\})=1/3,P(\{1,3\})=1/3,P(\{1,4\})=1/3,\dots P(\{1,2,3,4,5,6\})=1$.
+\vt 
+\item random variables $X$: dice value to the power three...
+\endit
+\vt
+%
+%\hspace{-3mm }
+\noindent\underline{Continuous  example}: Far-field Mach number in $[0.81,0.85]$, say
+\begit
+\item event $\xi$ = a Mach number value in $[0.81,0.85]$;  
+\item sample space $\Omega= [0.81,0.85]$;
+\item set of events ($\sigma$-algebra): for example all subparts of [0.81,0.85], ${\cal F}=2^\Omega$;
+\item probability function $P$: probability  of an element $I$ of ${\cal F}$  to be defined as the integral of a probability density function $D$ over $I$. For example: 
+\begin{displaymath}
+\begin{split}
+D( \phi) &= \frac{35}{32}(1-\phi^2)^3\,,\quad\phi=\frac{\xi-0.83}{0.02} \in~[-1,1] \\
+D_\xi(\xi) &= \frac{1}{0.02} D( \phi) = \frac{1}{0.02}\frac{35}{32}\left[1-\left(\frac{\xi-0.83}{0.02}\right)^2\right]^3\,;
+\end{split}
+\end{displaymath} 
+\vt 
+\item possible random variables $X$ = lift, drag, pitching moment of a wing... with variable Mach number $\smash{\Mach_\infty}$ (``event`` $\xi$) in the far-field.
+\endit
+%
+%
+ There are many classical probability density functions (PDFs). For engineering purpose where, most often, stochastic variables have finite upper and lower bounds, 
+ the so-called $\smash{\PDFb}$ distribution is often well-suited. It has two exponent parameters denoted $a$ and $b$ that allow to vary the shape
+ of the PDF from flat ($a=b=1$)  to very peaky (high $a$ and $b$). Distinct parameters lead to skewed distributions. The
+ formula of these PDFs on $\smash{[X_m,X_M]}$ (with the $a-1$, $b - 1$ convention for exponents) is:
+%
+\beq
+ \PDFb(x;a,b)=\frac{\Gamma(a+b)}{\Gamma(a)\Gamma(b)}\frac{(x-X_m)^{a-1}(X_M-x)^{b-1}}{(X_M-X_m)^{a+b-1}}{\mathbbm 1}_{[X_m,X_M]}(x)\,,
+\label{e:beta}
+\eeq
+where $x\mapsto\smash{{\mathbbm 1}_{I}}(x)$ is the characteristic function of the set $I$ such that $\smash{{\mathbbm 1}_{I}}(x)=1$ if $x\in I$ and $\smash{{\mathbbm 1}_{I}}(x)=0$ otherwise, and $\Gamma(z)=(z-1)!=\smash{\int_0^{+\infty}t^{z-1}\iexp^{-t}dt}$ is the usual Gamma function.
+%
+
+%===================================================
+\subsection{Monte-Carlo method}
+%====================================
+%
+ The Monte-Carlo method mimics the law of the events  in a series of calculations. 
+ It is the reference method for all uncertainty propagation methods. A presentation of the method is given hereafter for one uncertain parameter and
+ a scalar random variable.
+
+Classical stochastic toolboxes provide sampling $\smash{(\xi^1,\xi^2,... \xi^p,... \xi^N...)}$ for any standard PDF $D(\xi)$.
+The corresponding flow fields, $W(\xi^p)$, $p \in\llbracket 1,N\rrbracket$, depending on the stochastic parameter $\xi$ (variable angle of attack...) have then to be computed. The corresponding functional outputs ${\cal J}(\xi^p)=J(W(\xi^p))$ have then to be calculated. The classical unbiased Monte-Carlo estimations of the mean:
+$$ \esp({\cal J}) := \int {\cal J}(\xi) D(\xi)d\xi $$
+and variance:
+ $$  \sigma^2_{\cal J} := \esp( ({\cal J}-\esp({\cal J}))^2)= \int ({\cal J}(\xi)-\esp({\cal J}))^2 D(\xi)d\xi =\esp({\cal J}^2)-\esp({\cal J})^2$$
+from $N$ samples are:
+%
+ $$ \esp({\cal J}) \simeq \bar{{\cal J}_N} = \frac{1}{N}\sum_{p=1}^{N} {\cal J}(\xi^p)\,$$
+and:%
+ $$  \sigma^2_{\cal J} \simeq \sigma^2_{{\cal J}_N} = \frac{1}{N-1}\sum_{p=1}^{N} ({\cal J}(\xi^p)-\bar{{\cal J}_N})^2\,, $$
+%
+respectively. What is the accuracy of these estimates?
+%
+%-------------------------------------------------------------------------------------------------
+\subsubsection{Accuracy of estimated mean, known variance } 
+%
+ When the variance  $\smash{\sigma_{\cal J}}$ is known, the convergence in law of the mean\footnote{Note that the mean of a well defined stochastic variable does not always exist. Consider for example $D(x) = \frac{2}{\pi}\frac{1}{1+x^2}$ for $x>0$.} is characterized by the central limit theorem:
+\beq
+ \sqrt{N} \frac{\bar{{\cal J}_N}-\esp({\cal J})}{\sigma_{\cal J}} \leadsto \PDFN(0,1)
+\label{e:mc1}
+\eeq
+%
+where $\PDFN(0,1)$ is the normal (Gaussian) distribution which PDF $\smash{D_n}(x)$ and symmetric cumulative distribution function (CDF) $\smash{\Phi_n}(x)$ are: 
+%
+      $$D_n(x)=\frac{1}{\sqrt{2\pi}} \iexp^{-\frac{x^2}{2}}\,,\quad\Phi_n(x)=\frac{1}{\sqrt{2\pi}}\int_{-x}^x \iexp^{-\frac{t^2}{2}}dt\,,$$
+%  
+respectively. \eref{e:mc1} translates into a proposition like (with a symmetric interval):
+\begin{displaymath} 
+\textsl{With $\epsilon$ confidence}\quad\esp({\cal J}) \in \left[ \bar{{\cal J}_N}-u_{\epsilon}\frac{\sigma_{{\cal J}}}{\sqrt{N}},
+                   \bar{{\cal J}_N}+u_{\epsilon}\frac{\sigma_{{\cal J}}}{\sqrt{N}}\right]\quad\textsl{where}\quad
+   \epsilon = \frac{1}{\sqrt{2\pi}}\displaystyle\int_{-u_\epsilon}^{u_\epsilon} \iexp^{-\frac{t^2}{2}}dt\,.
+\end{displaymath}
+\tref{t:mc2} provides with some numerical values of $u_{\epsilon}$ and, for example: 
+$$ \textsl{With $99\%$ confidence}\quad\esp({\cal J}) \in \left[ \bar{{\cal J}_N}-2.576\frac{\sigma_{{\cal J}}}{\sqrt{N}},
+                   \bar{{\cal J}_N}+2.576\frac{\sigma_{{\cal J}}}{\sqrt{N}} \right]\quad\textsl{since}\quad0.99=\frac{1}{\sqrt{2\pi}}\displaystyle\int_{-2.576}^{2.576} \iexp^{-\frac{t^2}{2}}dt\,. $$
+
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+$\epsilon$ & 0.5 & 0.9 & 0.95 & 0.99\\
+\hline
+$u_{\epsilon}$ & 0.674 & 1.645 & 1.960 & 2.576 \\
+\hline
+\end{tabular}
+\caption{Value of $u_{\epsilon}$ for normal distribution}\label{t:mc2}
+\end{center}
+\end{table}
+%
+%-------------------------------------------------------------------------------------------------
+\subsubsection{Accuracy of estimated mean, unknown variance} 
+%
+In the common practical case where the variance $\sigma_{\cal J}$ is not known, the law for mean convergence is:
+%
+\beq 
+\sqrt{N} \frac{\bar{{\cal J}_N}-\esp({\cal J})}{\sigma_{{\cal J}_N}} \leadsto \mathcal{S}(N-1) 
+\label{e:mc3}
+\eeq
+where $\mathcal{S}$ is the student distribution. \eref{e:mc3} translates into a proposition like: 
+%
+   $$ \textsl{With $\epsilon$ confidence}\quad\esp({\cal J}) \in \left[ \bar{{\cal J}_N}-u_{\epsilon_{N-1}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}},
+                    \bar{{\cal J}_N}+u_{\epsilon_{N-1}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}} \right]\,,$$
+%
+where $\smash{u_{\epsilon_{N-1}}}$ as function of $\epsilon$ and $N$ can be found in tables. Some numerical values of $\smash{u_{\epsilon_{N-1}}}$ are given in \tref{t:mc4}.
+The Student distribution converges to the normal distribution for large $N$ and $u_{\epsilon_N}$ decreases when $N$ increases. The PDF of the Student distribution is:
+%
+$$ D_{{\cal S}(N)}(x)=\frac{\Gamma(\frac{N+1}{2})}{\sqrt{N\pi}\Gamma(\frac{N}{2})} \left(1+\frac{x^2}{N}\right)^{-\frac{N+1}{2}}\,,\quad x\in\Rset\,,$$
+%
+and of course, a more precise convergence property may then be stated:
+%
+   $$ \textsl{With $\epsilon$ confidence}\quad\esp({\cal J}) \in \left[ \bar{{\cal J}_N}-u_{\epsilon_{(N-1)}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}},
+                    \bar{{\cal J}_N}+u_{\epsilon_{(N-1)}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}} \right]\quad\textsl{where}\quad\epsilon = \displaystyle\int_{-u_{\epsilon_{N-1}}}^{u_{\epsilon_{N-1}}} D_{{\cal S}(N-1)}(t)dt\,.  $$
+
+The Student distribution $\mathcal{S}(N)$ is defined as the law of the random variable $T=\smash{\sqrt{\frac{N}{U}}}G$ where $G\sim\PDFN(0,1)$ is a normal random variable, and $U\sim\smash{\chi^2_N}$ is a random variable independent from $G$ following the $\smash{\chi^2_N}$ law with $N$ degrees of freedom ($N\geq 1$). Consequently, $U=\smash{\sum_{n=1}^N G_n^2}$ where $\smash{G_n}\sim\PDFN(0,1)$ are $N$ independent identically distributed (i.i.d.) normal random variables. The $\smash{\chi^2_N}$ distribution with $N$ degrees of freedom reads:
+$$ D_{\chi^2_N}(x)=\frac{x^{\frac{N}{2}-1}\iexp^{-\frac{x}{2}}}{2^\frac{N}{2}\Gamma(\frac{N}{2})}\,,\quad x\in\Rset^+\,.$$
+%
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\backslashbox{$\epsilon$}{$N$} & 2 & 3 & 20 & 30 & $\infty$ \\
+\hline
+0.95 & 12.71 & 4.303 & 2.093 & 2.045 & 1.960 \\ 
+\hline
+0.99 & 63.66 & 9.925 & 2.861 & 2.756 & 2.576 \\ 
+\hline
+\end{tabular}
+\caption{Value of $\smash{u_{\epsilon_{N-1}}}$ for Student distribution $\mathcal{S}(N-1)$, $N \geq 2$}\label{t:mc4}
+%
+\end{center}
+\end{table}
+%
+%-------------------------------------------------------------------------------------------------
+\subsubsection{Accuracy of estimated variance } 
+%
+The accuracy of the estimated variance ${\cal J}_N$ is discussed in the slides provided to the attendance in both cases of known and unknown mean. 
+%
+%-------------------------------------------------------------------------------------------------
+\subsubsection{Convergence speed of Monte-Carlo method} 
+%
+%
+ A typical realistic estimation of accuracy of mean estimated by the Monte-Carlo method is: for a $N$--points sampling, with $99\%$ confidence,
+  $$ \esp({\cal J}) \in \left[ \bar{{\cal J}_N}-u_{0.99,{N-1}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}},
+                       \bar{{\cal J}_N}+u_{0.99,{N-1}}\frac{\sigma_{{\cal J}_N}}{\sqrt{N}} \right]\,,$$
+%
+with  $u_{0.99,1}=63.66$, $u_{0.99,2}=9.925$, $u_{0.99,3}=5.841$, $u_{0.99,9}=3.250$, $u_{0.99,19}=2.861$, $u_{0.99,99}=2.756$...
+ decreasing with the number of samples $N$ towards the limiting value $2.576...$ 
+ The convergence speed of the Monte-Carlo method for mean value estimation is hence $\smash{\frac{1}{\sqrt{N}}}$ and
+ increasing the precision of Monte-Carlo estimation by a factor of $10$ requires multiplying the number
+ of evaluations by a factor of $100$. This is a very slow convergence and a very expensive method if one evaluation requires numerical solution of Euler or RANS equations.
+%\vt\\
+ 
+ Besides the outputs of many types of CFD calculations are very regular functions of the parameters of interest and it is necessary
+ to take advantage of this property. In meta-modeling approaches, precisely, the regularity of the random variables (then first seen as output variables) as function of stochastic
+ variables (then first seen as regular input variables) is exploited. There are many types of surrogates that can be combined
+ with the Monte-Carlo method (discussed in the next \sref{sec:MCsurr}). Besides there are specific polynomial expansions associated to the probability
+ density function (discussed in \sref{sec:gPC} and \sref{sec:SC}). The common feature of all this surrogate-based methods is that all stochastic quantities of interest--mean, variance, kurtosis, range, risk...--are estimated for the surrogate instead of the exact function of interest.
+%
+%===================================================
+\subsection{Surrogate-based Monte-Carlo}\label{sec:MCsurr}
+%===============================================
+%
+Metamodel-based Monte-Carlo method first requires the definition of a surrogate of the output(s) of interest on the space of stochastic parameters.
+ This is typically done with the meta-modeling toolboxes that are mainly used for global optimization and includes steps of inner parameter calculation and
+ design of experiment enrichment. Basically all types of surrogates may be used: Kriging, Radial Basis Function, Support Vector Regression, adjoint based quadratic
+  Taylor expansion... 
+ After this non-stochastic step has been carried out, stochastic evaluations are performed based on the (cheap) approximate output values provided by the surrogate. \fref{f:metamc} is a scheme of this process.\footnote{The author is not aware of any publication discussing the influence of the meta-model accuracy on accuracy of stochastic quantities
+  (mean, variance...). } 
+%
+\begin{figure}
+\begin{center}
+\includegraphics[width=13cm]{\FIGS/Figures/mc_mm2.pdf}
+\end{center}
+\caption{Monte-Carlo method with meta-models}
+\label{f:metamc}
+\end{figure}
+
+The asset of surrogate-based Monte-Carlo is illustrated with a simple and demonstrative example. The flow about a  NACA0012 profile was considered at following flow conditions 
+%
+$$\Mach=0.73\,,\;Re=6M\,,\;AoA=3^\circ\,.$$
+%
+ The angle of attack was assumed to have stochastic variations and the stochastic behaviour of the lift $\lift$,
+ was to be studied. The PDF of the angle of attack--varying in $[2.9^\circ, 3.1^\circ]$--was a Beta distribution (\ref{e:beta}): 
+%
+  $$ D_a(\alpha) =10 D_b(10(\alpha-3))\,,\quad D_b(\xi) =\frac{15}{16}(1-\xi)^2(1+\xi)^2. $$
+%
+RANS and $k$-$\omega$ calculations were run with the \elsA\ code \cite{CamHeiPlo_13} using standard numerical discretizations 
+ for a series of 11 Chebyshev points in the interval of angle of attack. For the corresponding 11 values of the lift $\lift$,
+ very regular identical curves were built by Ordinary Kriging, Radial Basis Function and Support Vector Regression--see \fref{f:naca-meta}. This almost linear curves, obtained with three different meta-models, for a quantity that is often
+ assumed to be linear as function of low angles of attacks, suggest a very accurate surrogate representation of the lift
+ on the parameter domain that can be used instead of CFD calculation for stochastic evaluations. This was done
+ and illustrated by \fref{f:naca-me-m} and \fref{f:naca-me-v}. With CFD-based Monte-Carlo method, with the fixed budget, only 100 CFD evaluations could be run.
+  This yielded the $90\%$, $95\%$, and $99\%$ confidence intervals for lift 
+and variance that appear in the left part of \fref{f:naca-me-m} and \fref{f:naca-me-v} for the considered stochastic sampling. When using metamodel-based 
+ Monte-Carlo, up to one million sampling points could be used reducing the intervals of confidence to smaller intervals than generally needed--right part of \fref{f:naca-me-m} and \fref{f:naca-me-v}.
+%
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=7cm]{\FIGS/Figures/CL_AoA.png}
+\end{center}
+\caption{NACA0012 $\lift$, as function of the Angle of Attack}
+\label{f:naca-meta}
+\end{figure}
+%
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[angle=270,width=7cm]{\FIGS/Figures/classic_CL_mean.pdf} \hspace{10mm}
+\includegraphics[angle=270,width=7cm]{\FIGS/Figures/mm_CL_mean.pdf}
+\end{center}
+\caption{Mean of $\lift$ coefficient and confidence interval (left CFD evaluations, right metamodel)}
+\label{f:naca-me-m}
+\end{figure}
+%
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[angle=270,width=7cm]{\FIGS/Figures/classic_CL_var.pdf} \hspace{10mm}
+\includegraphics[angle=270,width=7cm]{\FIGS/Figures/mm_CL_var.pdf}
+\end{center}
+\caption{Mean of $\lift$ coefficient and confidence interval (left CFD evaluations, right metamodel)}
+\label{f:naca-me-v}
+\end{figure}
+%
+%
+%
+\newpage
+%**********************************************************************************************
+\section{Generalized polynomial chaos}\label{sec:gPC}
+%********************************************************************************
+%
+Generalized Polynomial Chaos (gPC) is a spectral expansion method \cite{Wie_38,GhaSpa_91,XiuKar_02}.
+For a single real output $F$ and a single real stochastic input $\xi$, this expansion (denoted by $gF$) reads:
+%
+\beq
+ F(\xi)\simeq gF(\xi) = \sum_{l=0}^{M} C_l P_l(\xi)\,,  
+\label{e:gpc-exp} 
+\eeq
+%
+ where $P_l$ is a polynomial of degree $l$ and where the $\{P_l\}_{l\in\{0,...M\}}$ form an orthonormal basis 
+ for the dot product defined by the PDF $D(\xi)$ :
+\beq
+  <P_l,P_m> = \int P_l(\xi) P_m(\xi) D(\xi) d\xi = \delta_{lm}.
+\label{e:gpc-ortho} 
+\eeq
+%
+The main asset of the method is the straightforward calculation of the  mean and variance of gPC expansions.
+ More generally, all possible stochastic post-processing for $F$ is done for the specific surrogate $gF$
+ (which difference w.r.t. exact function $F$ may be discussed in the framework of spectral expansion theory). The method is presented in 1D (one uncertain parameter) and then in 2D (two uncertain parameters), the generalization from 2D to $d$D being straightforward.  
+%
+%===================================================
+\subsection{Families of orthonormal polynomials}
+%===============================================
+%
+The classical PDFs are associated to a family of polynomials that is orthogonal w.r.t. it in the sense of \eref{e:gpc-ortho}. The correspondance between classical PDFs and classical families of polynomials is the following: 
+\begit
+% 
+ \item Normal distribution $\smash{D_n}(\xi)=\smash{\frac{1}{\sqrt{2\pi}} \iexp^{-\frac{\xi^2}{2}}}$ on $\Rset$ $\rightarrow$ Hermite polynomials
+ \item Gamma distribution $D_g(\xi) = \iexp^{-\xi}$ on $\Rset^+$ $\rightarrow$  Laguerre polynomials
+ \item Uniform distribution $D_u(\xi)=0.5~$ on $[-1,1]$ $\rightarrow$ Legendre polynomials
+ \item Chebyshev distribution $\smash{D_{cf}}(\xi)=\smash{\frac{1}{\pi\sqrt{1-\xi^2}}}$ on $[-1,1]$ $\rightarrow$ Chebyshev (first-kind) polynomials 
+ \item Chebyshev distribution $\smash{D_{cs}}(\xi)=\sqrt{1-\xi^2}$ on $[-1,1]$ $\rightarrow$ Chebyshev (second-kind) polynomials 
+ \item Beta-distribution (see \eref{e:beta}) $\smash{D_b}(\xi) =\smash{ \frac{1}{C_{\alpha\beta}}(1-\xi)^\alpha(1+\xi)^\beta}$ for $ \alpha>-1$ and $\beta>-1$
+ on $[-1,+1]$ with the normalization constant $\smash{C_{\alpha\beta}}=\smash{\int_{-1}^1(1-u)^\alpha(1+u)^\beta du}$ $\rightarrow$ Jacobi polynomials (including Chebyshev and Legendre polynomials)
+ \item For non-usual probabilistic density functions $D_l(\xi)$, the polynomials are computed by Gram-Schmidt orthogonalization process.
+%
+\endit 
+Most often, the families of polynomials that satisfy the classical 
+3-term recurrence relation and exhibit the associated properties are orthogonal but not orthonormal
+ for the functional dot product  (\ref{e:gpc-ortho}). This is illustrated with Hermite polynomials associated to normal law
+ $D_n(\xi)=\smash{\frac{1}{\sqrt{2\pi}} \iexp^{-\frac{\xi^2}{2}}}$. The first polynomials are:
+%
+$$ \overline{PH}_0(\xi)=1\,,\quad\overline{PH}_1(\xi)=\xi\,,\quad\overline{PH}_2(\xi)=\xi^2-1\,,\quad\overline{PH}_3(\xi)=\xi^3-3\xi\,.$$
+The recursive definition is based on $ \overline{PH}_0(\xi)$, $\overline{PH}_1(\xi)$, and $\overline{PH}_{n+1}(\xi) = \xi \overline{PH}_n(\xi) -n \overline{PH}_{n-1}(\xi) $.
+%
+ A normalization of the standard Hermite polynomial is required 
+  $$ PH_j(\xi)=\frac{1}{\sqrt{ j!}} \overline{PH}_j(\xi)\,, $$
+ to define a family of proportional polynomials $\{PH\}$ that is orthonormal for $ D_n$:  
+ $$<PH_j,PH_k>=\int_\Rset PH_j(\xi)PH_k(\xi)D_n(\xi)d\xi = \delta_{jk}\,,$$
+ and hence suitable for the gPC method. 
+%
+%
+%========================================================
+\subsection{Calculation of coefficients by quadrature }
+%======================================================
+%
+ The gPC coefficients $\smash{C_l}$ can be calculated by quadrature or by collocation. Concerning the first method, let us first
+ note that $C_l = <gF,P_l>$ that is immediately proved multiplying \eref{e:gpc-exp} by $P_l(\xi)D(\xi)$
+ and integrating over the domain of variation of $\xi$. Actually, under regularity assumptions, $C_l = <F,P_l>$ 
+ and coefficient calculation by quadrature relies on this expression.
+
+Any classical 1D quadrature can be used to compute the gPC coefficients:
+%
+\beq
+    C_l = <F,P_l> = \int F(\xi)P_l(\xi)D(\xi) d\xi\,,\quad l\in \llbracket 0,M\rrbracket\,. 
+\label{e:gpc-coe-qua} 
+\eeq
+%
+Due to the presence of the term $D(\xi)$ in \eref{e:gpc-coe-qua}, the
+  $g$-points Gaussian quadrature associated to $D$ is a natural choice. 
+The formula of this quadrature is 
+      $$ \int h(\xi) D(\xi) d\xi \simeq \sum_{k=1}^{g} w_k h(\xigj_k) $$ 
+%
+  (where obviously the weights $\smash{w_k}$ and nodes $\smash{\xi_k}$ depend on $D(\xi)$). This formula is exact if $h$ is a
+  polynomial of degree up to degree $2g-1$. What would be a satisfactory number of points
+ to calculate the coefficients? A reasonable heuristic choice 
+ requires that orthonormality of polynomials $\smash{P_l}$ be satisfied at the discrete level. 
+ As the maximum degree of the product of two polynomials of the basis is $2M$, twice the expansion degree, the number
+ of quadrature points should verify
+ $$ 2M \leq 2g-1$$  
+to fulfill the discrete orthonormality requirement.
+%
+%========================================================
+\subsection{Calculation of coefficients by collocation }
+%======================================================
+%
+ Basically, collocations consists in forcing equality of $F$ and $gF$ for $M+1$ values of $\xi$. 
+ The corresponding linear system reads:
+%
+  $$  \sum_{l=0}^{M} C_l P_l(\xi_k) = F(\xi_k)\,,\quad\forall k \in \llbracket 1,M+1\rrbracket\,,$$
+%
+to be solved for for the gPC expansion coefficients $C_l$, $l\in\llbracket 0,M\rrbracket$. In this simple case where the sample cardinal is the number of unknowns ($M+1$), a linear system for the coefficients is solved. If the number of sampling evaluations $F(\xi_l)$ is larger than the number of unknown coefficients $M+1$, a least square problem has to be solved. Finally, anticipating a very short presentation in \sref{sec:RAE2822} on the application of a method called ``compressed sensing," the collocation equations are rewritten in matrix form as:
+%
+$$   {\bf K}{\bf C} = {\bf F}\,,$$
+%
+for $ {\bf F}$ being the column vector of $F$ values, ${\bf C}$ being the column vector of  unknown polynomial coefficients and  ${\bf K}$ being the matrix with terms $K_{ij}=  P_j(\xi_i) $.
+
+%=================================================
+\subsection{Stochastic post-processing}
+%=================================================
+%
+Stochastic post-processing is done for $gF$, the gPC approximation of $F$. The mean calculation reads:
+      $$ \esp(gF(\xi)) = \int \left( \sum_{l=0}^{M} C_l P_l(\xi) \right)  D(\xi) d\xi = C_0\,, $$
+ due to orthonormality of the $\smash{P_l}$, $ l\geq 1 $, to $\smash{P_0}$ or any other scalar factor (in other words, the integral of the $P_l$, $\smash{l\geq 1}$   
+ is zero). The mean value of $gF(\xi)$ with $D(\xi)$ as stochastic distribution of the input $\xi$ is hence the first
+ coefficient of the expansion. The calculation of the variance of $gF$ is also very simple thanks to orthonormality of the polynomial basis:
+      $$ \esp((gF(\xi)-C_0)^2)=\int \left( \sum_{l=1}^M C_l P_l(\xi) \right) ^2 D(\xi)d\xi = \sum_{l=1}^{M}  C_l^2\,. $$ 
+The variance is the sum of the square of all coefficients but the $C_0$.
+
+As in surrogate-based Monte-Carlo, any other stochastic quantity is estimated for $gF$, the gPC surrogate. The skewness for example is calculated as: 
+\begin{equation}\label{eq:skewness}
+\esp\left( \left(\frac{ gF(\xi) -\mu }{\sigma}\right)^3\right) = \frac{1}{ ( \sum_{l=1}^{M} C_l^2)^{\frac{3}{2}}}\int \left( \sum_{l=1}^{M} C_l P_l(\xi) \right)^3 D(\xi) d\xi
+\end{equation}
+%
+that requires the knowledge or the calculation of the $\int P_l(\xi) P_n(\xi) P_p(\xi) D(\xi) d\xi$ integrals \cite{SAV17}. The range of $F$ would be estimated sampling for $\xi$ and searching for the range of $gF(\xi)$. Just as the same, the probability  that $F$ exceeds a threshold $T$ would be approximated as: 
+     $$\int {\mathbbm 1}_{\{gF(\xi)>T\}} D(\xi) d\xi$$  
+ and derived from a sampling of $gF$.
+%
+%=================================================
+\subsection{Case of  vector outputs}
+%=================================================
+%
+Generalized polynomial chaos can be applied to scalar outputs as presented in previous sections but also to vector fields. Line or surface wall distribution of pressure or other aerodynamic variables are typical vector fields to which the gPC method would be applied. The extension of previous equations is rather simple. For a general presentation, a generic mesh index $i$ and the stochastic variable $\xi$ are the arguments of a field $W(i,\xi)$. The corresponding gPC expansion reads:
+% 
+ $$  W(i,\xi)\simeq gW(i,\xi) = \sum_{l=0}^M C_l(i) P_l(\xi)\,.  $$
+%
+For a fixed mesh index $i$, all formulas of previous sections can be applied. In particular, the estimation of mean and variance are:
+% 
+    $$ \esp(gW(i,\xi)) = \int \left( \sum_{l=0}^{M} C_l(i) P_l(\xi) \right) D(\xi) d\xi = C_0(i)\,, $$
+and:
+   $$ \esp((gW(i,\xi)-C_0(i))^2)=\int \left( \sum_{l=1}^{M}  C_l(i) P_l(\xi) \right) ^2 D(\xi)d\xi = \sum_{l=1}^{M}  C_l(i)^2\,, $$
+respectively.
+%
+%=================================================
+\subsection{Extension to $d$ dimensions ($d$D)}\label{sec:gPC-tensor}
+%=================================================
+%
+Before discussing sparsification of output polynomial expansions and sparsification of quadratures in \sref{sec:SGQ}, a full-tensorial extension of the 1D gPC method is considered. The presentation is done in 2D but the extension to $d$D is then straightforward. The joint probability of the two uncertain parameters $(\xi_1,\xi_2) \in$ \Ir$^1 \times$ \Ir$^2 $ is assumed to have the simple form:
+%
+                   $$ D(\xi_1,\xi_2) = D^{\alpha}(\xi_1)D^{\beta}(\xi_2)\,.$$ 
+%
+The  orthogonal polynomials associated to the dot products involving  $D^\alpha(\xi_1)$ and $D^\beta(\xi_2)$ are respectively
+ $\smash{(P^\alpha_0,P^\alpha_1,P^\alpha_2,...)}$ and $\smash{(P^\beta_0,P^\beta_1,P^\beta_2,\dots)}$. The 2D tensorial gPC expansion
+ with ($M^1+1$)-point in direction 1, and ($M^2+1$)-point in direction 2, then reads:
+%
+\beq
+ F(\xi_1,\xi_2) \simeq gF(\xi_1,\xi_2) = \sum_{k\leq M^1,l \leq M^2} C_{kl} P^\alpha_k (\xi_1)  P^\beta_l (\xi_2)
+\label{e:gpc-exp-2d}
+\eeq
+ %
+\vt\\
+%
+ The description of the full-tensorial approach (that will highlight  the interest of sparse approaches) then requires the 
+ definition of the tensorial product of two 1D quadratures. The tensor product of quadratures
+      $$  A[f] = \sum_{k=1}^{g^\alpha} \omega^\alpha_k f(\xi^\alpha_k)\quad\left( \textrm{approximating}\;\int_{\Ir^1 }f(u) D^\alpha(u) du \right) $$ 
+ and 
+      $$  B[g] = \sum_{l=1}^{g^\beta} \omega^\beta_l g(\xi^\beta_l)\quad\left( \textrm{approximating}\;\int_ {\Ir^2} g(v) D^\beta(v) dv \right )\,, $$
+%
+for integration over \Ir$^1 \times$ \Ir$^2$ is denoted by $(A \otimes B)$ and defined as:
+%
+        $$ (A \otimes B)[h] = \sum_{k\leq g^\alpha, l \leq g^\beta} \omega^\alpha_k \omega^\beta_l h(\xi^\alpha_k, \xi^\beta_l)\,. $$
+%
+ The evaluation of a gPC coefficient by this quadrature is: 
+%
+   $$ C_{kl} = \int_{\Ir^1\times \Ir^2 } F(\xi_1, \xi_2) D^\alpha (\xi^1) D^\beta(\xi^2) d\xi_1 d\xi_2 \simeq  (A \otimes B)[F]
+    =  \sum_{k\leq g^\alpha, l \leq g^\beta} \omega^\alpha_k \omega^\beta_l F(\xi^\alpha_k, \xi^\beta_l)\,.  $$
+%
+It requires $g^\alpha \times g^\beta$ flow calculations and evaluations of $F$.
+%
+ The coefficients of the 2D expansion (\ref{e:gpc-exp-2d}) could as well be calculated by collocation, identifying the spectral expansion for 
+  $(M^1+1) \times (M^2+1) $ points with exact evaluations
+% 
+     $$ \sum_{k\leq M^1,l \leq M^2} C_{kl} P^\alpha_k (\xi_1^s)  P^\beta_l (\xi_2^s) = F(\xi_1^s, \xi_2^s)\,,\quad s \in \llbracket 1,(M^1+1) \times (M^2+1)\rrbracket\,.$$
+%
+ As in the 1D case, the calculation of mean and variance of the expansion $gF$ is simple thanks to the orthonormality of the basis:
+% 
+ \beas    
+    \esp(gF)& =& \int \left( \sum_{k\leq M^1,l \leq M^2} C_{kl} P^\alpha_k (\xi_1)  P^\beta_l (\xi_2) \right) d\xi_1 d\xi_2 = C_{00}
+  \vr\\
+\var(gF) &=& \esp((gF-C_{00})^2)\\
+      &=&\int \left(  \sum_{k\leq M^1,l \leq M^2 } C_{kl} P^\alpha_k (\xi_1)  P^\beta_l (\xi_2) D(\xi_1,\xi_2)d\xi_1 d\xi_2 -C_{00}\right) ^2 D(\xi_1)^\alpha D^\beta(\xi_2)d\xi_1 d\xi_2 \\ 
+      &=&\int \left(   \sum_{k\leq M^1,l \leq M^2~(k,l)\neq (0,0)} C_{kl} P^\alpha_k (\xi_1)  P^\beta_l (\xi_2) \right) ^2 D(\xi_1)^\alpha D(\xi_2)^\beta d\xi_1 d\xi_2 \\
+      &=&\sum_{k\leq M^1,l \leq M^2~(k,l)\neq (0,0)} C_{kl}^2\,.  
+  \eeas
+
+%
+%**********************************************************************************************
+\section{Stochastic collocation }\label{sec:SC}
+%****************************************
+
+%==================================================
+\subsection{Expansion}
+%=================================================
+%
+Stochastic Collocation (SC) is another non-intrusive polynomial method \cite{NobTemWeb_08}. It is based on Lagrangian polynomial expansion.
+ It it first described for a vector field (generic mesh index $i$) in the 1D case (one uncertain parameter $\xi$). 
+%
+Given a set of $(M+1)$ distinct values of $\xi$ ($\smash{\xi_1,\xi_2,\dots\xi_{M+1}}$), Stochastic Collocation is a dedicated polynomial expansion using Lagrangian polynomials:
+%
+  $$ W(i,\xi) \simeq scW(i,\xi) = \sum_{l=1}^{M+1} W_l(i) H_l(\xi)\,,\quad H_l(\xi) = \prod_{m=1, m\neq l}^{M+1} \displaystyle\frac{(\xi-\xi_m)}{(\xi_l-\xi_m)} $$
+%
+where $scW$ is a polynomial of degree $M$ (sum of polynomials of degree $M$). We have to immediately note that:
+%
+    $$scW(i,\xi_l)=  \sum_{l=1}^{N} W_l(i) H_l(\xi_l) = W_l(i)\,. $$
+%
+ There is hence no coefficient calculation step but the flow has to be computed for all $\smash{\xi_l}$, $l\in\llbracket 1,M+1\rrbracket$, and $\smash{W(i,\xi_l)}$ has then to be derived
+ from the whole field of state variables. Then, obviously:
+%
+ $$  scW(i,\xi) = \sum_{l=1}^{M+1} W(i,\xi_l) H_l(\xi)\,. $$
+%
+
+%================================================
+\subsection{Stochastic post-processing}
+%================================================
+%
+Although this is not absolutely mandatory (see the slides for two other cases), we consider here that ($\smash{\xi_1,\xi_2,...\xi_{M+1}}$) are the $M+1$ points of the $(M+1)$-point Gaussian quadrature associated to $D(\xi)$, the corresponding weights being $\smash{(\omega_1, \omega_2,...,\omega_{M+1})}$. As for the gPC method, the stochastic post-processing is done for $scW$ instead of $W$.
+
+The evaluation of mean value precisely uses the Gaussian quadrature which nodes are the same as those of the Lagrange set: 
+%
+     $$ \esp(scW(i)) = \int scW(i,\xi) D(\xi) d\xi= \sum_{m=1}^{M+1} \omega_m scW(i,\xi_m) = \sum_{m=1}^{M+1} \omega_m W(i,\xi_m)\,.  $$
+%
+This calculation is exact as $scW$ is of degree $M$ whereas the quadrature is exact for polynomials up to degree $2M+1$. Just as the same, the evaluation of variance is also based on the Gaussian quadrature and also exact (degree $2M$ polynomial):
+ \beas
+     \esp((scW(i)-\esp(scW(i)))^2)&=&   \esp(scW(i)^2) -\esp(scW(i))^2 \\
+                 &=&   \int scW(i,\xi)^2 D(\xi)d\xi  -\esp(scW(i))^2      \\
+                 &=&   \sum_{m=1}^{M+1} \omega_m  scW(i,\xi_m)^2  -\esp(scW(i))^2\\
+                 &=&  \sum_{m=1}^{M+1}  \omega_m W(i,\xi_m)^2- \left(\sum_{m=1}^{M+1} \omega_m W(i, \xi_m)\right)^2\,.
+ \eeas
+
+
+%================================================
+\subsection{Extension to $d$ dimensions ($d$D)}
+%================================================
+%
+The presentation is done for  2 uncertain parameters  $(\xi_1,\xi_2) \in$ \Ir$^1 \times$ \Ir$^2 $, the extension to $d$ dimensions ($d$D) being straightforward. 
+The joint probability distribution is assumed to be:
+%
+                   $$ D(\xi_1,\xi_2) = D^{\alpha}(\xi_1)D^{\beta}(\xi_2).$$ 
+%
+For the sake of simplicity, the method is presented for a scalar output. A tensorial grid of $(M^1+1)$ and $(M^2+1)$ Gauss-points associated to $D^{\alpha}$ and $D^{\beta}$ is considered: 
+ $$  (\xi^\alpha_1, \xi^\alpha_2,...,\xi^\alpha_{M^1+1})\otimes(\xi^\beta_1, \xi^\beta_2,...,\xi^\beta_{M^2+1})\,,  $$
+ the weights being: 
+%
+ $$    (\omega^\alpha_1, \omega^\alpha_2,...,\omega^\alpha_{M^1+1})\otimes(\omega^\beta_1, \omega^\beta_2,...,\omega^\beta_{M^2+1})\,.$$ 
+%
+ The Lagrange polynomials associated to the two sets are
+% 
+  $$   H_k^\alpha(\xi_1) = \prod_{m=1, m\neq k}^{M^1+1} \displaystyle\frac{(\xi_1-\xi^\alpha_m)}{(\xi^\alpha_k-\xi^\alpha_m)}\,,\quad H_l^\beta(\xi_2) = \prod_{m=1, m\neq l}^{M^2+1} \displaystyle\frac{(\xi_2-\xi^\beta_m)}{(\xi^\beta_l-\xi^\beta_m)}\,        $$
+%
+respectively. The stochastic collocation 2D expansion is:
+  $$  F(\xi_1,\xi_2)\simeq scF(\xi_1,\xi_2)  = \sum_{k \leq M^1 ; l\leq M^2} d_{k,l}  H_k^\alpha(\xi_1) H_l^\alpha(\xi_2)\,.      $$
+%
+As in the 1D case, the coefficients of the expansion are easily identified as $\smash{d_{kl}}=F(\xi^\alpha_k,\xi^\beta_l)$ so that:
+  $$  scF(\xi_1,\xi_2)  = \sum_{k \leq M^1 ; l\leq M^2}  F(\xi^\alpha_k,\xi^\beta_l) H_k^\alpha(\xi_1) H_l^\beta(\xi_2)\,.     $$  
+%
+ The tensor product of the two Gaussian rules is defined as:
+%
+    $$ \int  F(\xi_1,\xi_2) D^\alpha(\xi_1) D^\beta(\xi_2) d\xi_1 d\xi_2 = \sum_{k \leq M^1+1 ; l\leq M^2+1} \omega^\alpha_k \omega^\beta_l F(\xi^\alpha_k,\xi^\beta_l)\,. $$
+%
+ It exactly integrates  all monomials $ \xi_ 1^p   \xi_ 2^q $ such that  $p \leq 2M^1 +1$ and  $q \leq 2M^2 +1$.  
+ The calculation of the mean of $scF$ reads:  
+ %
+   $$   \esp(scF) =\int  scF(\xi_1,\xi_2) D^\alpha(\xi_1) D^\beta(\xi_2) d\xi_1 d\xi_2 =  \sum_{k \leq M^1+1 ; l\leq M^2+1} \omega^\alpha_k \omega^\beta_l scF(\xi^\alpha_k,\xi^\beta_l)\,   $$
+%
+ but simply $scF(\xi^\alpha_k,\xi^\beta_l) = F(\xi^\alpha_k,\xi^\beta_l)$ and:
+%
+   $$  \esp(scF) =  \sum_{k \leq M^1+1 ; l\leq M^2+1} \omega^\alpha_k \omega^\beta_l F(\xi^\alpha_k,\xi^\beta_l)\,.   $$
+%
+ It is exact thanks to the property of polynomial exactness of the tensor Gaussian quadrature.
+ 
+The calculation of the variance $scF$ is also exact due to the  degree of the involved polynomials 
+%
+ \begin{displaymath}
+ \begin{split}
+  \var(scF) &=  \esp((scF-\esp(scF))^2) = \esp(scF^2)-\esp(scF)^2 \\ 
+         &=  \int  scF(\xi_1,\xi_2)^2 D^\alpha(\xi_1) D^\beta(\xi_2) d\xi_1 d\xi_2 - \esp(scF)^2  \\
+        &=   \sum_{k \leq M^1+1 ; l\leq M^2+1} \omega^\alpha_k \omega^\beta_l F(\xi^\alpha_k,\xi^\beta_l)^2  -
+                                       \left( \sum_{k \leq M^1+1 ; l\leq M^2+1} \omega^\alpha_k \omega^\beta_l F(\xi^\alpha_k,\xi^\beta_l)\right)^2\,.
+  \end{split}
+  \end{displaymath}
+%
+%=============================================================
+\subsection{Conclusion on the cost of tensorial methods}
+%==============================================================
+%
+If we assume the tensorized gPC or SC method is applied in $d$ dimensions with $M$ points per stochastic direction then the number of
+ required CFD calculations is $\smash{M^d}$, which is not sustainable if $d$ is high. For example with $9$ points per direction, the  required number of simulations is:
+%
+$$ 9^2= 81\,,\;9^4 = 6,561\,,\;9^5=59,049\,,\;9^{6}= 531,441\,,\;9^{8}= 43,046,721\,,\;9^{10}= 3,486,784,401 $$
+%
+ that is only feasible at reasonable cost up to $d=4$ or $5$. This increasing cost with the number of dimension is called {\bf curse of dimensionality}. This is the reason why polynomials in total degree $t$ are considered. They involve
+ $$ Z = \binom{d+t}{d}$$
+terms. It is then reasonable to search for quadratures that are exact for monomials of total degree that is lower than a given integer (and not such that the maximum degree of each individual term is lower than a given integer). Smolyak's sparse quadratures \cite{Smo_63,NovRit_97,GerGri_98} often called sparse grids, that are described in the next section, have a neighboring property of polynomial exactness.
+%
+%***********************************************************************************************
+\section{Introduction to Smolyak sparse grids }\label{sec:SGQ}
+%**************************************************
+%
+%====================================================
+\subsection{Reminder. Tensor product of quadratures}
+%=====================================================
+%
+As already mentioned in \sref{sec:gPC-tensor} the tensor product of 1D quadratures
+%
+ $$ A[f]=\sum_{i=1}^m a_i f(x_i)\quad\text{and}\quad B[f] =\sum_{i=1}^n b_i f(y_i),  $$ 
+%
+meant to sum functions over $\Ir_1$ and $\Ir_2$ is:   
+%
+$$ A \otimes B[g] = \sum_{i=1}^m \sum_{j=1}^n a_i b_j g(x_i,y_j)\,, $$
+%
+ tensor quadrature for functions defined over  $\Ir_1 \times \Ir_2$. The direct extension to $d$D of this tensor-product quadrature formula is:
+%
+$$  A_{1}\otimes A_2 \otimes\cdots\otimes A_{d}[g] = \sum_{i_1=1}^{n_{1}} \sum_{i_2=1}^{n_2}\cdots \sum_{i_d=1}^{n_{d}} w_{1i_1}w_{2i_2}\dots w_{di_d} g(x_{1i_1},x_{2i_2},\dots x_{di_d})\,. $$
+%
+%=================================================================================
+\subsection{Hierarchy of quadratures. Difference of quadratures}
+%================================================================================
+%
+ All the 1D-quadratures of interest are here supposed to be part of a hierarchical set of rules $\smash{Q_l}$ (not necessarily nested\footnote{A set of quadratures $\smash{(Q_l)_{l\in\Nset}}$ is said to be nested iff all points of $l$-th quadrature $\smash{Q_l}$ are also quadrature points of the $(l+1)$-th level quadrature $\smash{Q_{l+1}}$.}) and 
+ the index is the one of the hierarchy. The formula of tensor quadrature is rewritten in this case   
+%
+ $$  Q_{l_1}\otimes Q_{l_2}\cdots\otimes Q_{l_d}[f] = \sum_{i_1=1}^{n_{l_1}}\sum_{i_2=1}^{n_{l_2}}\cdots\sum_{i_d=1}^{n_{l_d}} w_{l_1i_1}w_{l_2i_2}\dots w_{l_di_d} f(x_{l_1i_1},x_{l_2i_2},\dots x_{l_di_d})\,. $$
+%
+  Besides, differences of quadrature formulas of the hierarchy may be defined by:
+%
+\begin{displaymath}
+\begin{split}
+   \Delta_k [f] &:= Q_k [f] - Q_{k-1} [f]\,, \\
+        Q_0 [f] &:= 0\,.
+\end{split}
+\end{displaymath}
+%
+In general, the difference formula $\smash{\Delta_k[f]}$ is defined on the union of the grids of the two quadratures $\smash{Q_k}$ and $\smash{Q_{k-1}}$ (which is the grid of $\smash{Q_k}$ in the nested case). Let us now note that the simple product formula with level $\smash{l_1}$, $\smash{l_2}$, ... $\smash{l_d}$ for the successive variables may be characterized by the following sum:
+%
+\beq  
+  Q_{l_1}\otimes Q_{l_2}\cdots\otimes Q_{l_d}[f] = \sum_{{\bf k}/~ 1\leq k_j \leq l_j} \Delta_{k_1}\otimes\Delta_{k_2}\cdots\otimes \Delta_{k_d} [f]  
+ \label{eq_tenssmo}
+\eeq 
+%
+ This property is derived from the sum of the successive $\Delta$:
+%
+   $$ \sum_{k=1}^{n} \Delta_k [f]  = (Q_1 [f] - Q_0 [f]) + (Q_2 [f] - Q_1 [f]) +\cdots+(Q_n[f] - Q_{n-1}[f]) = Q_n[f] $$    
+%
+ and is easily checked for low dimensions. For example, the expansion of $Q_3\otimes Q_2 [f]$ is checked 
+ summing the lines then the rows (or criss-cross) of the right-hand side of the following equation: 
+\begin{displaymath}
+\begin{split}
+  Q_3\otimes Q_2 [f] = &  \quad\,(Q_3-Q_2) \otimes (Q_2-Q_1) [f] + (Q_3-Q_2) \otimes (Q_1-Q_0) [f]  \\
+                      & + (Q_2-Q_1) \otimes (Q_2-Q_1) [f] + (Q_2-Q_1) \otimes (Q_1-Q_0) [f]   \\
+                      & + (Q_1-Q_0) \otimes (Q_2-Q_1) [f] + (Q_1-Q_0) \otimes (Q_1-Q_0) [f] \,.
+\end{split}
+\end{displaymath}
+
+%=======================================================================
+\subsection{Smolyak's sparse grids}
+%====================================================================
+%
+ Smolyak's sparse grids \cite{Smo_63,NovRit_97,GerGri_98} are linear combinations of tensor-product operators meant to balance computational effort and accuracy.
+ Their direct definition is based on \eref{eq_tenssmo} where the domain of indices is restricted to a simplex:
+\beq
+  Q_l^d [f] = \sum_{|{\bf k}|_1 \leq l+d-1} \Delta_{k_1} \otimes\cdots\otimes \Delta_{k_d} [f] \,,
+\label{eq_smo_1}
+\eeq 
+%
+where $\smash{|{\bf k}|_1}=\smash{\sum_{j=1}^d k_j}$. In this expression, the weights of the tensor-product quadratures obtained when developing the $\Delta$ differences, are sums of products of weights. Besides, the lowest possible value of $l$ is 1. The lower value of $\smash{|{\bf k}|_1}$ for non zero terms is hence $d$ so that the definition of sparse grids can possibly be made more explicit:
+\beq
+  Q_l^d [f] =\sum_{j=d}^{d+l-1} \sum_{{\bf k}/|{\bf k}|_1=j} \Delta_{k_1} \otimes \cdots \otimes \Delta_{k_d} [f]\,.
+\label{eq_smo_2}
+\eeq 
+%
+ The link between $\smash{Q_{l+1}^d}$ and $\smash{Q_l^d}$ is then obviously:
+%
+\beq
+  Q_{l+1}^d [f] =   Q_l^d [f]+  \sum_{{\bf k}/|{\bf k}|_1=d+l} \Delta_{k_1} \otimes\cdots\otimes \Delta_{k_d} [f]\,.
+\label{eq_smo_3}
+\eeq
+%
+Of course, a direct expression in terms of the quadratures $\smash{Q_l}$ (rather than their  $\Delta$ differences) is of great interest. The formula is (see \cite{GerGri_98}): 
+%
+\beq
+    Q_l^d [f] = \sum_{\max(l,d)\leq |{\bf k}|_1 \leq l+d-1} (-1)^{l+d-|{\bf k}|_1-1} \binom{d-1}{|{\bf k}|_1-l}
+%   \left (
+%  \begin{tabular}{c}
+%   $ d-1$ \\
+%   ${|{\bf k}|}_1-l $
+%  \end{tabular}
+%  \right)
+Q_{k_1} \otimes \cdots \otimes Q_{k_d} [f]
+%
+\label{eq_smo_4} 
+\eeq
+where the lower value $\smash{|{\bf k}|_1}$ is indeed $\max(l,d)$ and not $d$ as could be guessed from \eref{eq_smo_1}. This means that the tensor product of the lowest order quadratures are not involved in the higher order (that is higher $l$) formulas. They are canceled in the additive process of \eref{eq_smo_3} when increasing the level $l$. The number of points $n(Q^d_l)$ involved in the sum of \eref{eq_smo_4} depends of course of the set $\smash{Q_k}$ of 1D quadrature. An obvious upper bound may be derived from the last equation:
+% 
+$$  n(Q^d_l) \leq \sum_{\max(l,d)\leq |{\bf k}|_1 \leq l+d-1}  n_{k_1} n_{k_2}... n_{k_d}\,.$$
+% 
+%=======================================================================
+\subsection{Polynomial exactness}
+%=========================================================
+%
+Tensorial product of 1D polynomials is defined as:
+%
+$$ \bigotimes_{i=1}^d \mathbb{P}^1_{m_i}=\left\{ \Rset^d\ni (x_1, ..., x_d)\mapsto \prod_{i=1}^d p_i(x_i)\in \Rset\,,\;p_i \in {\cal P}_{m_i}^1 \right\}\,,$$
+%
+where $\smash{{\cal P}_{m_i}^1}$ is the set of mono-variable polynomials of degree lower or equal to $\smash{m_ i}$. The $i$-th quadrature of the 1D hierarchy $\smash{Q_ i}$ is assumed to have polynomial exactness $\smash{m_i}$ such that $\smash{m_i}\leq \smash{m_{i+1}}$. Smolyak's sparse grid quadrature:
+%
+$$  Q_l^d [f] = \sum_{|{\bf k}|_1 \leq l+d-1}\Delta_{k_1} \otimes\cdots\otimes \Delta_{k_d} [f] $$
+%
+ is then exact for all polynomials of the non-classical vector space:
+%
+    $$  {\cal V}(Q_l ^d)  = \text{Span} \{ {\cal P}^1_{m_{k_1}} \otimes\cdots\otimes {\cal P}^1_{m_{k_d}}\,;\;|{\bf k}|_1 = l+d-1 \}\,. $$
+%
+{\bf Example}: Assume a series of four nested ($n$ to $n+2$) rules $\smash{U_1}$, $\smash{U_2}$, $\smash{U_3}$, and $\smash{U_4}$ has been defined. They involve $\smash{n_1}=1$, $\smash{n_2}=3$, $\smash{n_3}=5$, and $\smash{n_4}=7$ points and, as classical 1D interpolatory quadrature, their polynomial exactness is $\smash{m_1}=0$, $\smash{m_2}=2$, $\smash{m_3}=4$, and $\smash{m_4}=6$. Smolyak's sparse grid $\smash{U_4^2}$ is defined as:
+\begin{displaymath}
+\begin{split}
+  U_4^2 [f] &= \sum_{j=2}^{5} ~~~\sum_{{\bf k}/|{\bf k}|_1=j} \Delta_{k_1} \otimes \Delta_{k_2} [f] \\
+                 &= ( U_4\otimes U_1 + U_3 \otimes U_2 + U_2 \otimes U_3 + U_1\otimes U_4 + \text{lower order}) [f] \,.
+\end{split}
+\end{displaymath}
+ From the previous property, $\smash{U_4^2}$ is exact for polynomials of the non-classical vector space  $\smash{{\cal V}(U_4 ^2)}$:
+%
+\begin{displaymath}
+\begin{split}
+  {\cal V}(U_4 ^2) &=\text{Span}\{ {\cal P}_{m_4}\otimes {\cal P}_{m_1} + {\cal P}_{m_3} \otimes {\cal P}_{m_2} +
+                            {\cal P}_{m_2} \otimes {\cal P}_{m_3} + {\cal P}_{m_1}\otimes {\cal P}_{m_4}   \}  \\
+                            &= \text{Span}\{ {\cal P}_{6}\otimes {\cal P}_{0} + {\cal P}_{4}\otimes {\cal P}_{2} +
+                            {\cal P}_{2} \otimes {\cal P}_{4} + {\cal P}_{0}\otimes {\cal P}_{6}   \}\,.
+\end{split}
+\end{displaymath}
+%%
+%=======================================================================
+\subsection{Number of evaluations, error analysis}
+%=========================================================
+%
+ These points can not be discussed independently from the selected hierarchical family of 1D quadratures $\smash{Q_l}$. Most often, results are presented
+ for the Clenshaw-Curtis rule \cite{CleCur_60,Imh_63}. The results derived by Novak and Ritter \cite{NovRit_97} for this choice of $\smash{Q_l}$ are presented here 
+ (but the convention of \cite{GerGri_98} is kept for indices of sparse grids). The $Q_l$ are the nested Clenshaw-Curtis quadratures with $n_l$ points such that:
+ \begin{displaymath}
+\left\{ \begin{split}
+ n_l &= 2^{l-1}+1\,,\quad l>1\,, \\
+ n_1 &= 1\,.
+\end{split}\right.
+\end{displaymath}
+Of course, all weights of the 1D rules are positive and the degree of polynomial exactness is $\smash{m_l} = \smash{n_l-1} $. For fixed dimension $d$ and $l \rightarrow \infty $ the number of points involved in $\smash{Q^d_ l}$, denoted by $\smash{n(Q^d_l)}$, is equivalent (in the strong sense of limit of sequences being equal to 1) to (see \cite{NovRit_97}): 
+%
+ $$  n(Q^d_l) \simeq  \frac{1}{(d-1)! 2^{d-1}} 2 ^{l-1} (l-1)^{d-1}\,. $$
+%
+ The largest number of points in one direction for a sparse grid based on nested quadrature is obtained for the largest of the individual $k$ indices.
+ The largest values of the sum of $k$ directional quadrature indices in $\smash{Q^d_l}$ is $d+l-1$. As $\smash{Q_0}$ is zero that largest possible single direct $k$ value is
+ $l$ (obtained for one $\smash{k_j}$ equal $l$ all the other equal 1). The corresponding number of points is $\smash{2^{l-1}+1}$. The ``tensorial counterpart'' 
+ of  $\smash{Q^d}$ would  hence involve a full tensorial grid of $\smash{(2^{l-1}+1)^d}$ points.
+
+Besides, there exists a constant $\smash{c_d>0}$ depending on $d$ only such that the sum of the absolute value of the weights of $\smash{Q^d_ l}$, denoted by $\smash{SW(Q^d_l)}$, is bounded by:
+%
+  $$   SW(Q^d_l) \leq  c_d ( \log (n(Q_l^d)) )^{d-1}\,.$$
+%
+Finally  we introduce two spaces of functions with bounded derivatives: 
+%
+  $$ C^r_d = \left\{ f : [-1,1]^d \to \Rset\,;\;\underset{|{\bf k}|_1 \leq r}\max~|| f ^{({\bf k})} ||_\infty < \infty \right\}\,,$$
+and:
+  $$ F^r_d = \left\{ f : [-1,1]^d \to \Rset\,;\;\underset{|{\bf k}|_\infty \leq r}\max~|| f ^{({\bf k})} ||_\infty < \infty \right\}\,,$$
+%
+where $\smash{|{\bf k}|_\infty=\underset{j}\max\,k_j}$; the errors bounds of $\smash{Q^d_l}$, $\smash{R(Q_l^q)[f]}$ for functions of $\smash{C^r_d}$ and $\smash{F^r_d}$, are respectively \cite{NovRit_97}:
+%
+  $$ |R(Q_l^q)[f]| \leq c_{r,d}~ (n(Q^d_l))^{-r/d} \log(n(Q^d_l)) ^{(d-1)(r/d+1)} ~|| f ||_{\infty}\,,\quad \forall f \in C^r_d \,, $$
+%
+ and
+ %
+  $$ |R(Q_l^q)[f]| \leq c_{r,d}~ (n(Q^d_l))^{-r} \log(n(Q^d_l)) ^{(d-1)(r+1)}~ || f ||_{\infty}\,,\quad \forall f \in F^r_d\,,  $$
+%
+ where of $\smash{c_{r,d}>0}$ only depends on regularity $r$ and dimension $d$ and where the infinity norms refers to the max of the infinity norm of all derivatives
+ defined respectively for functions of $\smash{C^r_d}$ and functions of $\smash{F^r_d}$. The loss of accuracy in large dimensions due to the $d$ factor in $\smash{n(Q^d_l)^{-r/d}}$
+ (for $\smash{C^r_d}$) instead of $\smash{n(Q^d_l)^{-r}}$ (for $\smash{F^r_d}$) is sometimes also referred as the ``curse of dimensionality'' (as the number of points in tensor product quadratures).
+ 
+ 
+ %**************************************************************************************************
+\section{Introduction to variance analysis}\label{sec:Var}
+%**********************************************************
+%
+ Whereas the individual influence of the inputs of a regular multivariate function $f$ is locally estimated calculating the partial derivatives
+ of $f$, Sobol' proposed a framework for a global (and hence more powerful) analysis that attributes a part of the total variance of $f$
+ on its domain of definition to each variable and subsets of the variables. The associated functional decomposition is called {\bf ANOVA representation}
+ ({\bf ANalysis Of VAriance}) and the corresponding fractions of variance are called {\bf Sobol' indices} \cite{Sob_01}.   
+%
+%====================================
+\subsection{ANOVA representation}
+%===================================
+%
+This representation is generally presented for a function $f$ defined over $\smash{[0,1]^d}$ with all inputs $\smash{(\xigj_1,\xigj_2,\dots\xigj_d)}$ following a uniform distribution over $[0,1]$. This framework is also considered here although the results are unchanged if $\xig =\smash{(\xigj_1,\xigj_2,\dots\xigj_d)}$ follows a product law $\smash{D(\xigj_1,\xigj_2,\dots\xigj_d)} =\smash{D(\xigj_1) D_2(\xigj_2)\dots D_d(\xigj_d)}$. The following representation is sought for $f$:
+%
+\beq\label{e:anova}
+f(\xig) = f_0 + \sum_{i=1}^d f_i(\xigj_i)+ \sum_{1\leq i<j\leq d} f_{ij}(\xigj_i,\xigj_j) + \sum_{1\leq i<j<k\leq d} f_{ijk}(\xigj_i,\xigj_j,\xigj_k) + \cdots + f_{1,2,\dots d} (\xi_1,\xi_2,...,\xi_d)
+\eeq
+%
+where the integral of all the $\smash{f_{i_1,\dots i_s}(\xigj_{i_1},\dots\xigj_{i_s})}$ functions w.r.t. any of their independent arguments shall be zero (only $\smash{f_0}$ has not a non-zero integral over $\smash{[0,1]^d}$):
+\begin{displaymath}
+\int_0^1 f_{i_1,\dots i_s}(\xigj_{i_1},\dots\xigj_{i_s})d\xigj_{i_k}=0\,,\quad\forall k\in\llbracket 1,s\rrbracket\,.
+\end{displaymath}
+As a consequence of this requirement, the functions of the decomposition are orthogonal for the $\smash{L^2}$ inner product. For example,
+%
+$$ \int_ {[0,1]^d} f_{23}(\xigj_2,\xigj_3)f_{134}(\xigj_1,\xigj_3,\xigj_4)d\xigj_1 d\xigj_2\dots d\xigj_d = 0 $$
+%
+is proved integrating for $\smash{\xigj_2}$ or $\smash{\xigj_4}$.
+
+The proof of the decomposition's existence is actually constructive. Integrating over all variables, then all variables but one, then all variables but two... yields:
+%   
+\begin{displaymath}
+\begin{split}
+\esp(f) &= \int_{[0,1]^d} f(\xig)  \prod_l d\xigj_l \\
+&= f_0\,, \\
+%
+\esp(f|\xigj_i) &=\int_{[0,1]^{d-1}} f(\xig) \prod_{l\neq i} d\xigj_l  \\
+&= f_0 + f_i(\xigj_i)\,,\\
+%
+\esp(f|\xigj_i,\xigj_j)  &= \int_{[0,1]^{d-2}} f(\xig) \prod_{l\neq i,j} d\xigj_l \\
+&= f_0 + f_i(\xigj_i) + f_j(\xigj_j) + f_{ij}(\xigj_i,\xigj_j)\,, \\
+%
+\esp(f|\xigj_i,\xigj_j,\xigj_l) &=  \int_{[0,1]^{d-3}} f(\xig) \prod_{l\neq i,j,k} d\xigj_l \\
+&= f_0 + f_i(\xigj_i) + f_j(\xigj_j) + f_k(\xigj_k) + f_{ij}(\xigj_i,\xigj_j) + f_{ik}(\xigj_i,\xigj_k) + f_{jk}(\xigj_j,\xigj_k) + f_{ijk}(\xigj_i,\xigj_j,\xigj_k)\,,
+%
+\end{split}
+\end{displaymath}
+%
+and so on, which indicates how the functions of the ANOVA decomposition are successively calculated. If $f$ is square integrable, thanks to the orthogonality property:
+%
+\begin{multline}\label{e:ana2}
+   \int_{[0,1]^d} f(\xig)^2 d\xig  =  f_0^2 + \sum_{i=1}^d \int_{[0,1]^d} f_i(\xigj_i)^2 d\xig + \sum_{1\leq i<j\leq d} \int_{[0,1]^d}  f_{ij}(\xigj_i,\xigj_j)^2 d\xig \\
+  + \sum_{1\leq i<j<k\leq d}\int_{[0,1]^d}  f_{ijk}(\xigj_i,\xigj_j,\xigj_k)^2 d\xig +\cdots + \int_{[0,1]^d} f_{1,2,\dots d} (\xigj_1,\xigj_2,\dots\xigj_d)^2 d\xig
+\end{multline}
+%
+is easily deduced from \eref{e:anova}. The variance of the function of interest has hence been decomposed in a sum of contributions attributable to all possible sets of variables.
+%
+%===============================
+\subsection{Sobol' indices}
+%=================================
+%
+The Sobol' indices are ratios of the terms of the right-hand side in \eref{e:ana2} to the total variance of $f$:
+%
+   $$ \var(f) =  \int_{[0,1]^d} f(\xig)^2 d\xig - \esp(f) ^2 = \int_{[0,1]^d} f(\xig)^2 d\xig - f_0 ^2\,.  $$
+%
+They represent the part of the variance attributable to each set of variables, namely:
+%
+\beq\label{e:sobol1}
+ \sigma_i = \frac{1}{\var(f)} \int_{[0,1]^d} f_i(\xigj_i)^2 d\xig\quad\left(=\frac{1}{\var(f)} \int_0^1 f_i(\xigj_i)^2 d\xigj_i\right) 
+\eeq
+%
+for individual variables,
+%
+\beq\label{e:sobol2}
+\sigma_{ij} = \frac{1}{\var(f)}  \int_{[0,1]^d} f_{ij}(\xigj_i,\xigj_j)^2 d\xig\quad\left(=\frac{1}{\var(f)}\int_0^1\int_0^1 f_{ij}(\xigj_i,\xigj_j)^2 d\xigj_i d\xigj_j \right) 
+\eeq
+%
+for pairs of variables, and so on for larger sets of variables. Of course, from \eref{e:ana2},
+%
+ $$    \sum_{i=1}^d \sigma_i + \sum_{1\leq i<j\leq d} \sigma_{ij}  + \sum_{1\leq i<j<k\leq d} \sigma_{ijk} + \cdots +  \sigma_{1,2,\dots d} = 1\,. $$
+%
+%
+%============================================================
+\subsection{Sensitivity indices for subsets of variables}
+%========================================================
+%
+For any subset $\smash{\xig_\text{sub}}$ of $\xig =\smash{(\xigj_1,\xigj_2,\dots\xigj_d)}$, let us define by $S$ the list of the indices of the $\smash{\xigj_l}$ variables that are part of $\smash{\xig_\text{sub}}$. The complementary set of variables of $\xig$ is denoted $\smash{\xig_{\sim\text{sub}}}$. It is classical to define the sum of the Sobol' indices of all the subsets of $\smash{\xig_\text{sub}}$. This quantity is the fraction of the variance attributed by ANOVA to all combination of variables of $\smash{\xig_\text{sub}}$. It is also denoted here with the letter $\sigma$ but with a superscript referring to the set of variables:
+ %
+$$ \sigma_\text{sub} = \sum_{s=1}^{\#S} \sum_{(i_1<i_2<\dots<i_s)\in S}  \sigma_{i_1,i_2,\dots i_s}\,. $$
+%
+The so called {\bf total index} of the variables of $\smash{\xig_\text{sub}}$ qualifies the fraction of the variance attributed to all sets of variables including at least one of the terms of $\smash{\xig_\text{sub}}$. It is denoted here $\smash{\sigma_{T\text{sub}}}$ with a superscript referring to the set of variables. It is obviously equal to:
+%
+$$ \sigma_{T\text{sub}}= 1 - \sigma_{\sim\text{sub}} $$
+%
+as the terms that involve at least one variable of $\smash{\xig_\text{sub}}$ and those that do not involve any form a partition of all possible sets of variables. For example, the total sensitivity index $\sigma_{Ti}$ of the $i$-th input parameter $\smash{\xigj_i}$ is the sum of all Sobol' indices involving that parameter:
+\begin{displaymath}
+\sigma_{Ti}=\sum_{{\mathcal I}_i}\sigma_{i_1,\dots i_s}\,,\quad{\mathcal I}_i=\{(i_1,\dots i_s);\,\exists k\in\llbracket 1,s\rrbracket,i_k=i\}\,,
+\end{displaymath}
+and it can be shown that:
+\begin{displaymath}
+\sigma_{Ti}=1-\sigma_{\sim i}\,,
+\end{displaymath}
+where $\smash{\sigma_{\sim i}}$ is the sum of all Sobol' indices that do not involve the $i$-th parameter.
+%
+%====================================
+\subsection{Numerical example}
+%===================================
+%
+ The calculation of Sobol' indices is illustrated for:
+%
+$$ f(x,y,z) = 1+2 x + 3 x^2 + 4xy + 2 y + 3 z^2 $$
+%
+ with uniform distribution for the three variables in [0,1] (therefore $\esp(x)=\esp(y)=\esp(z)=\smash{\frac{1}{2}}$). The mean and variance of $f$ are:
+%
+$$  \esp(f) = 6\,,\quad\var(f) = \frac{287}{45}\,. $$
+%
+The first term of the ANOVA decomposition is $\smash{f_0} = \esp(f) = 6$. The conditional expectations for one fixed variable are:
+%
+$$ \esp(f|x) = 3+ 4 x + 3 x^2\,,\quad\esp(f|y) = 4+ 4 y\,,\quad\esp(f|z)= 5+ 3 z^2\,. $$
+%
+The $\smash{f_1}$, $\smash{f_2}$, and $\smash{f_3}$ terms of the decomposition are then easily deduced as:
+%
+\begin{displaymath}
+\begin{split}
+ f_1(x) &= \esp(f|x) -f_0 =  -3 + 4 x + 3 x^2\,, \\
+ f_2(y) &= \esp(f|y) - f_0 = -2 + 4 y\,,    \\
+ f_3(z) &= \esp(f|z) - f_0 = -1 + 3 z^2\,.
+\end{split}
+\end{displaymath}
+%
+The conditional expectations for two fixed variables are:
+%
+$$ \esp(f|x,y) = 2+ 2 x + 3 x^2 + 4 xy + 2 y\,,\quad (f|x,z) = 2+4x+3 x^2 + 3 z^2\,,\quad\esp(f|y,z) = 3 + 4 y + 3 z^2\,,$$
+%
+and subsequently the $\smash{f_{12}}$, $\smash{f_{13}}$, and $\smash{f_{23}}$ terms of the ANOVA expansion are:
+\begin{displaymath}
+\begin{split}
+ f_{12}(x,y) &= \esp(f|x,y) -f_0 -f_1(x) - f_2(y) = 1-2x+4xy -2y\,, \\
+ f_{13}(x,z) &= \esp(f|x,z) -f_0 -f_1(x) - f_3(z) = 0\,,   \\
+ f_{23}(y,z) &= \esp(f|y,z) -f_0 -f_2(y) - f_3(z) = 0\,,  
+\end{split}
+\end{displaymath}
+that is consistent with the fact that only $x$ and $y$ interact in function $f$. Similarly:
+%
+$$ f_{123}(x,y,z) = f(x,y,z) -f_0 - f_1(x) - f_2(y) - f_3(z) - f_{12}(x,y) - f_{13}(x,z) -  f_{23}(y,z) = 0$$
+%
+that is, once again, consistent with the dependencies of $f$. The calculations can be fully or partially verified checking {\sl a posteriori} the basis property of the decomposition:
+%
+ $$ \esp_x(f_1(x)) = 0\,,\quad\esp_y(f_1(y)) = 0\,,\quad\esp_z(f_3(z)) = 0\,,\quad\esp_x(f_{12}(x,y)) = 0\,,\quad\esp_y(f_{12}(x,y)) = 0\,. $$
+%
+ Finally, it is checked that:
+%
+ $$ \esp(f_1(x)^2) + \esp(f_2(y)^2) + \esp(f_3(z)^2) + \esp(f_{12}(x,y)^2)  = \frac{62}{15} + \frac{4}{3} +\frac{4}{5} + \frac{1}{9}  = \frac{287}{45} = \var(f)\,.  $$
+%
+The Sobol' indices are equal to:
+$$ \sigma_x = \frac{62}{15} \times\frac{45}{287}\,,\quad\sigma_y = \frac{4}{3}\times\frac{45}{287}\,,\quad\sigma_z = \frac{4}{5}\times\frac{45}{287}\,,\quad\sigma_{xy} = \frac{1}{9}\times\frac{45}{287}\,. $$  
+%
+ The fraction of variance due to $x$, $y$, $z$, and $(x,y)$ jointly are respectively 64.80\%, 20.90\%, 12.54\% and 1.74\%.
+%
+%=================================================
+\subsection{Sobol's indices of a gPC expansion}
+%==============================================
+%
+Consistently with \sref{sec:gPC-tensor}, the results are given in 2D with the indication of how they would be extended to $d$D. So let us start with $\xig=\smash{(\xigj_1,\xigj_2)}$, and the 2D polynomial chaos is denoted by:
+%
+ $$ gF(\xig) = \sum_{(k,l) \in {\cal I}} C_{kl} P^\alpha_k (\xigj_1)  P^\beta_l (\xigj_2)\,, $$
+%
+where the set of exponents is most often either $\{(k,l)\,;\;k+l \leq M \}$ (total degree) or  $\{(k,l)\,;\;k\leq M^1,l \leq M^2 \}$ (individual degrees). Let us recall that $\esp(gF) = \smash{C_{00}}$ and:
+\beq
+ \var(gF(\xig))= \sum_{(k,l)\in {\cal I} / 1\leq k+l}  C_{kl}^2\,.
+\label{e:gpc3}
+\eeq
+The expression of variance is to be compared with \eref{e:ana2} for two variables:
+%
+$$  \var(f)= \int f(\xig)^2 d\xig - f_0^2 =  \int f_1(\xigj_1)^2 d\xig +  \int f_2(\xigj_2)^2 d\xig +  \int f_{12}(\xigj_1,\xigj_2)^2 d\xig\,. $$
+%
+The definition of the generalized polynomial chaos and the orthogonality of basis provide an immediate identification of the $\smash{f_1}$, $\smash{f_2}$, and $\smash{f_{12}}$ functions of the ANOVA representation:
+%
+\begin{displaymath}
+\begin{split}
+f_1(\xigj_1) &= \sum_{k=1}^M  C_{k0} P^\alpha_k (\xigj_1)\,, \\
+f_2(\xigj_2) &= \sum_{l=1}^M  C_{0l} P^\beta_l (\xigj_2)\,, \\
+f_{12}(\xigj_1,\xigj_2) &= \sum_{(k,l) \in {\cal I};k\geq 1,l \geq 1}  C_{kl} P^\alpha_k (\xigj_1) P^\beta_k (\xigj_2)\,.
+\end{split}
+\end{displaymath}
+%
+Obviously:
+$$ \var(f_1) =  \sum_{k=1}^M  C_{k0}^2\,,\quad\var(f_2)= \sum_{l=1}^M  C_{0l}^2\,,\quad\var(f_{12}) = \sum_{(k,l)\in {\cal I};k\geq 1,l \geq 1 }  C_{kl}^2\,, $$
+%
+and the sum of these three terms provide the expected decomposition of the variance (\ref{e:gpc3}). The three Sobol' indices $\smash{\sigma_1}$, $\smash{\sigma_2}$, and $\smash{\sigma_{12}}$ of the gPC in 2D are then calculated according to equations (\ref{e:sobol1}) and (\ref{e:sobol2}). If $d$ uncertain variable are involved, the variance due to interaction of variables $\smash{(\xigj_{i_1},\xigj_{i_2},\dots\xigj_{i_s})}$ is the sum the square of the coefficients of the gPC polynomial terms involving all these variables and only these variables. The corresponding $\smash{\sigma_{i_1,i_2,\dots i_s}}$ Sobol' indice is obtained by dividing this sum by the total variance.
+%
+ 
+%
+%***********************************************************************************************
+\section{Examples of application}\label{sec:Examples}
+%************************************************
+%
+\subsection{Generic missile FG5--Three uncertain parameters}\label{sec:FG5}
+%
+ The section summarizes a UQ exercice performed by the Deutsches Zentrum f\"ur Luft- und Raumfahrt (DLR), the US Air Force (USAF), and \Onera\ in the framework of the RTO-AVT 191 group. The reference publication for this work is \cite{JPGoeGra_17}. The considered geometry is a generic missile, called FG5, with four fins. The angle between the upper fin and the vertical plane is $22.5^\circ$ (so that the configuration is neither what is named an ``$\times$'' nor what is called a ``$+$''). The geometry is fully defined by mathematical curves and surfaces in \cite{JPGoeGra_17}, all lengths being defined as multiples of the diameter $D$ that is also used to evaluate the Reynolds number. \fref{f:fg5} presents a global view of the configuration.
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=7.8cm]{\FIGS/Figures-FG5/missile.jpg}
+\end{center}
+\caption{Wall-mesh of FG5 configuration}\label{f:fg5}
+\end{figure}
+%
+Wind-tunnel measurements were carried out at two Reynolds numbers, with fixed or natural transition. During all the experiments, the angle of attack was varied. The experiment was repeated for verification (see \fref{f:fg5e}: two pink curves, short term repetition; orange curve, tens years after repetition). Six of the experimental plots presenting forces and moments as functions of the angle of attack have been released and published in 2017 in \cite{JPGoeGra_17}.
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=5.5cm]{\FIGS/Figures-FG5/SideForce.png}
+\includegraphics[width=5.5cm]{\FIGS/Figures-FG5/RollingMoment.png}
+\includegraphics[width=5.5cm]{\FIGS/Figures-FG5/YawingMoment.png}
+\end{center}
+\caption{FG5 configuration. Measured side force, rolling moment, yawing moment as function of the angle of attack}
+\label{f:fg5e}
+\end{figure}
+%
+
+The UQ exercise was based on the following nominal flow conditions:  Mach number $\smash{\Mach_\infty}=0.8$, angle of attack $\alpha=12^\circ$, and Reynolds number based on diameter $\smash{Re_D}=0.6\cdot 10^6$ (with fixed transition for the experiment but this option was not used in the calculations). This corresponds to the pink and orange curves of the experimental plots. The three partners first launched steady state RANS calculations using their in-house code with their favorite numerical and modeling options: \Onera\ ran the \elsA\ code for RANS with Spalart-Allmaras turbulence closure model, DLR ran the TAU code for RANS and $k$--$\omega$ model, and USAF ran the AVUS code for RANS and Spalart-Allmaras model. The pressure coefficients\footnote{The pressure coefficient is $K_p=2\smash{\frac{p-p_\infty}{\rho_\infty V_\infty^2}}$ where $p$ is the static pressure, and $\smash{p_\infty}$, $\smash{\rho_\infty}$, and $\smash{V_\infty}$ are the free-stream pressure, density, and velocity.} $K_p$ at the fin walls and the total pressure in vertical planes crossing the missile were compared in order to check the main inviscid and viscous (dissipative vortices stemming from the nose) features of the flow. This comparison of nominal flows was found to be satisfactory \cite{JPGoeGra_17}.     
+
+This comparison was a good starting point for a three-parameter ($d=3$) UQ exercise. The angle of attack $\alpha$, upper fin angle, and upper fin position were considered as stochastic variables. The three outputs of interest were the side force (CYA), the rolling moment (CLA), and the yawing moment (CNA). The reason for this choice is that they vary non-linearly in the considered interval of angle of attack. More precisely, the intervals of variation and probability density functions of the three UQ parameters were the following:
+%
+ \begit
+  \item Angle of attack in $[10^\circ,14^\circ]$ with PDF:
+   $$  d\alpha' = (\alpha-12)/2\,,\quad D^{s2}(d\alpha')= \frac{15}{16}(1-d\alpha'^2)^2\,; $$
+  \item Change in upper fin azimutal position in $[-1^\circ,1^\circ]$ with PDF: 
+    $$  d\phi = \phi- 22.5\,,\quad D^{s3}(d\phi)= \frac{35}{32}(1-d\phi^2)^3\,; $$
+  \item Upper fin angle in $[-1^\circ,1^\circ]$ with PDF:
+    $$    D^{s3}(\xi)= \frac{35}{32}(1-\xi^2)^3\,. $$ 
+  \endit
+The  joint PDF of the three uncertain parameters was simply:
+%
+  $$    D(d\alpha',d\phi,\xi)= D^{s2}(d\alpha')D^{s3}(d\phi)D^{s3}(\xi)=\frac{15}{16}\frac{35^2}{32^2} (1-d\alpha'^2)^2 (1-d\phi^2)^3 (1-\xi^2)^3\,.  $$ 
+%
+After the sign of the variation in the outputs when varying individually the three parameters have been checked, the three-parameter UQ exercice was performed.
+ 
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=5.2cm]{\FIGS/Figures-FG5/meshdef_finangle_1.png}
+\hspace{3mm}
+\includegraphics[width=5.2cm]{\FIGS/Figures-FG5/meshdef_finposition.png}
+\caption{Visualisation of mesh deformation for fin angle (left) and fin azimuthal position (right). Both deformations need to be combined
+ for some of the sampling points}
+\end{center}
+\end{figure}
+
+\Onera\ could run 31 calculations sampling the parameter space according to a Smolyak's sparse grid based on 1D F\'ejer second rule. Unfortunately this quadrature is not associated to the PDF that had to be part of the integrand... and the joint pdf of the three parameters, $D(d\alpha',d\phi,\xi)$, is a degree 16 polynomials. The sparse quadrature actually failed to correctly integrate the $D(d\alpha',d\phi,\xi)$. To solve this issue, a Kriging surrogate was fitted to the 31 evaluations of CLA and orresponding surrogates were built for CYA, CNA. Calculation of mean value and variance of the three force/moments of interest was then based on Riemann sums for surrogate $\times $  $D(d\alpha',d\phi,\xi)$.
+ 
+DLR used a surrogate-based Monte-Carlo strategy. The global calculation budget was 76 TAU simulations. The simulations were run in successive series, checking intermediate results provided by the stochastic post-processing. Three Kriging surrogates were fitted to sets of 8 then 16... then 76 CLA, CYA, CNA values. At the end of the process of surrogates construction, one million Monte-Carlo samples were built from the cumulative probability density functions of $D^{s2}(d\alpha')$, $D^{s3}(d\phi)$, and $D^{s3}(\xi)$. Monte-Carlo mean and variance were then calculated for the Kriging surrogates based on the  $D(d\alpha',d\phi,\xi)$-consistent sampling. Besides, visualisation of the PDFs of the outputs of interest were performed.
+
+The calculation budget devoted to the exercice by USAF was 10 simulations. A Design of Experiment of ten points (corners of the parameters domain plus two face centers) was selected and the corresponding flows were calculated. The series of computations allowed to define a quadratic polynomial surrogate for each of the functional output of interest. Finally, a variance decomposition analysis was based on the quadratic surrogate.
+
+The discrepancy between the results of the partners is illustrated by figure \ref{f:fg5-tab} that presents side-by-side, \Onera\ and DLR results. The difference between steady state nominal forces and moments has been considered acceptable. The difference between mean values of forces and moments has also been considered acceptable. The discrepancy between the variance of rolling moment and yawing moment was quite significant.\footnote{Note here that it had been apparently smaller presenting standard deviation instead of variance.} This has not been fully explained although significant differences appeared between \elsA\ and TAU calculations in the slopes of the outputs of interest when varying only the fin angle (see \cite{JPGoeGra_17}, Fig.~17). This is incitement to work on both CFD real problems and relevant mathematical functions to deepen the analysis of results, identifying the influence of the distinct CFD codes, and the influence of the distinct UQ methods.
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=16.0cm]{\FIGS/Figures-FG5/synthese-stoch-ONERA.png}
+\vr\\
+\includegraphics[width=16.0cm]{\FIGS/Figures-FG5/synthese-stoch-DLR.png}
+\end{center}
+\caption{Synthesis of \Onera\ (up) and DLR (down) results for the three-parameter UQ exercise}
+\label{f:fg5-tab}
+\end{figure}
+%
+
+%==============================================================================================
+\subsection{RAE 2822--Three uncertain parameters}\label{sec:RAE2822}
+%==============================================================================================
+%
+This section summarizes a UQ study performed in the framework of the EU project UMRIDA (\href{http://www.umrida.eu}{www.umrida.eu}). 
+ The reference for this work is \cite{SavResJP_16}. The aerodynamic configuration of interest is the well-known RAE2822 aerofoil with the following flow conditions (they are derived from classical corrections applied to case \#6 of the experiments conducted by RAE \cite{CooMcDFir_79}): 
+%
+ $$ \nominal{\Mach}_\infty=0.725\,,\quad\nominal{\alpha}=2.92^\circ\,,\quad Re=6.50\cdot10^6\,. $$
+%
+Outputs of interest were the drag $\drag$, lift $\lift$, and pitching moment $\moment$ coefficients. They were calculated with the \elsA\ code \cite{CamHeiPlo_13} solving RANS equations with the Spalart-Allmaras turbulence closure model. A $769\times 193$ c-structured mesh was used; its far-field boundary was about 1000 chord from the airfoil--see \fref{f:rae-mesh}.
+Classical numerical options were selected and the resulting nominal discrete flow was considered as satisfactory (see Fig. 2 in \cite{SavResJP_16}). 
+
+The free-stream Mach number $\smash{\nominal{\Mach}_\infty}$, angle of attack $\smash{\nominal{\alpha}}$ and thickness to chord ratio $\smash{\nominal{r}}=h/c$
+ were then assumed to vary stochastically following a $\smash{\PDFb}$ law with the range and exponent--referring to \eref{e:beta})--displayed in \tref{t:rae}.
+%
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|}
+\hline
+& \makebox[3em]{$a=b$} &  \makebox[3em]{$X_m$} & \makebox[3em]{$X_M$} \\
+\hline\hline
+$\xigj_1$ & $4$ & $0.97\times\nominal{r}$ & $1.03\times \nominal{r}$ \\
+$\xigj_2$ & $4$ & $0.95\times\nominal{\Mach}_\infty$ & $1.05\times\nominal{\Mach}_\infty$ \\
+$\xigj_3$ & $4$ & $0.98\times\nominal{\alpha}$ & $1.02\times\nominal{\alpha}$ \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Domain of variation and exponent of $\smash{\PDFb}$--distribution for the stochastic parameters of the RAE2822 text case}
+\label{t:rae}
+\end{table}
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=6.cm]{\FIGS/Figures-RAE/GridNom.png}
+\hspace{3mm}
+\includegraphics[width=6.cm]{\FIGS/Figures-RAE/GridNomZoom.png}
+\end{center}
+\caption{C structured mesh for RAE2822 calculations}
+\label{f:rae-mesh}
+\end{figure}
+%
+The  orthonormal polynomials associated to the common probability density function of the three uncertain parameters (after their ranges have been scaled to $[-1,1]$) are the normalized Jacobi polynomials denoted by $\psi$:   
+                  $$<\psi_j,\psi_k>=\int_{-1}^{+1}\psi_j(\xi)\psi_k(\xi)~ \frac{35}{32}(1-\xi^2)^3 d\xi = \delta_{jk}\,,\quad\text{deg}(\psi_j)=j\,.$$
+%
+ It was decided to represent $\drag$, $\lift$, and $\moment$ by multivariate gPC expansions of total degree $t=8$. For $\drag$ for example, one has: 
+%
+  $$ g\drag(\xigj_1, \xigj_2, \xigj_3) = \sum_{| {\bf j} |_1=j_1+j_2+j_3 \leq 8} c_{\bf j}~\psi_{j_1}(\xigj_1) \psi_{j_2}(\xigj_2) \psi_{j_3}(\xigj_3)\,.  $$ 
+%
+The number of coefficients $\smash{c_{\bf j}}$ to calculate is the dimension of the polynomial vector space, that is, with $d=3$ random parameters and a total degree $t=8$, 
+%
+    $$ Z = \binom{t+d}{d} = \binom{8+3}{3} = \binom{11}{3} = 165\,.  $$
+%
+ The coefficients of the three gPC expansions were first calculated by quadratures, as: 
+\begin{displaymath}
+\begin{split}
+c_{\bf j} &= \int  \psi_{{\bf j}}({\bf \xi}) \drag({\bf \xi}) D({\bf \xi})d{\bf \xi} \\
+            &= \int  \psi_{j_1}(\xigj_1) \psi_{j_2}(\xigj_2) \psi_{j_3}(\xigj_3) \drag(\xigj_1,\xigj_2,\xigj_3) \frac{35^3}{32^3}(1-\xigj_1^2)^3 (1-\xigj_2^2)^3 (1-\xigj_3^2)^3 d\xigj_1 d\xigj_2 d\xigj_3, 
+\end{split}
+\end{displaymath}
+ with a full-tensorial quadrature and a sparse one. Their common base is the 1D Gauss-Jacobi-Lobatto (GJL) quadrature associated to the common probability density function. It
+ is non nested (except that the extremum points are involved in the stencil of all levels). Its polynomial exactness for $p$ points is degree $2p-3$. The tensorial quadrature was the tensor-product of the $10$-point GJL quadrature in the three directions. The sparse quadrature was the $7$-th level Smolyak's sparse grid based on the 1D GJL quadrature (level $p$ in the 1D base hierarchy corresponding to $p$ integration points.) This sparse quadrature involves $201$ points whereas, of course, the full tensorial quadrature involves $10^3=1000$ points. The stencils are illustrated by \fref{f:rae-quads}. The reference mean and variance were those obtained with $1000$-point tensor quadrature--see \tref{t:rae-tabful}. It was observed that Smolyak's sparse grid based on $201$ evaluations provided almost identical results.
+%
+\begin{figure}[!h]
+\begin{center}
+\includegraphics[width=16cm]{\FIGS/Figures-RAE/stencil-2-quadratures.png}
+\caption{Visualization of 6-point tensorial Gauss-Jacobi-Lobatto quadrature and 7-th level Smolyak's quadrature based on GJL nodes--gPC coefficients are calculated with 10-point tensorial GJL quadrature and 7-th level Smolyak's quadrature based on GJL nodes}\label{f:rae-quads}
+\end{center}
+\end{figure}
+%
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c||c|c|}
+\hline
+& \makebox[3em]{$\mu$} &  \makebox[3em]{$\sigma$}  \\
+\hline\hline
+$\drag$ & 133.37e-04 & 34.128e-04  \\
+$\lift$ & 72.274e-02 & 1.6695e-02  \\
+$\moment$ & -453.99e-04 &  32.239e-04 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{RAE2822: First two moments of the aerodynamic coefficients computed by the 10-th level product rule (1000 points)}
+\label{t:rae-tabful}
+\end{table}
+%
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c||c|c|}
+\hline
+ & \makebox[3em]{$\mu$} &  \makebox[3em]{$\sigma$} \\
+\hline\hline
+$\drag$ & 133.38e-04 & 34.097e-04  \\
+$\lift$ &  72.269e-02 & 1.6729e-02  \\
+$\moment$ & -453.96e-04 & 32.175e-04 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{RAE2822: First two moments of the aerodynamic coefficients computed by the 7-th level sparse rule (201 points)}
+\label{t:rae-tabspa}
+\end{table}
+%
+
+Finally, a method called ``compressed sensing'' \cite{CAN08} is used to calculate the gPC coefficients with a low number $q$ of function evaluations (that is, flow calculations), even lower than the dimension of the functional space. The collocation equations for the gPC coefficients are first recalled in explicit form,
+%
+  $$  \sum_{ | {\bf j} |_1 \leq t} C_{\bf j} P_{\bf j}(\xig_k) = F(\xig_ k)\,,\quad\forall k \in \llbracket 1,q\rrbracket\,, $$
+%
+ and in vector-matrix form:
+%
+    $$   {\bf K}{\bf C} = {\bf F}\,,  $$
+%
+for $ {\bf F}  $ being the column vector of $F$ values, ${\bf C}$ being the column vector of unknown polynomial coefficients, and ${\bf K}$ being the matrix $\smash{K_{i{\bf j}}}= \smash{P_{\bf j}(\xigj_i)}$. If the number of samples $q$ is equal to the dimension of the polynomial basis ($q=Z$), a classical linear system is to be solved.
+ If the number of samples is larger than the dimension of the polynomial basis ($q>Z$), a least square problem is to be solved.
+ If the number of samples is smaller than the dimension of the polynomial basis ($q<Z$), compressed sensing may be used
+ under the conditions that: (i) the actual $gPC$ expansion that is looked for, is sparse, meaning it has many coefficients very close to 0. 
+ This is often the case. This is called "{\bf sparsity of effects}" and is verified for the searched expansions for the current test-case;
+ and (ii) a (random) sampling incoherent with the basis of polynomials is available. That property is measured by the ``mutual coherence'' $\mcoherence$:
+%
+   $$\mcoherence =\max_{\tiny\begin{array}{c}1\leq j,l\leq Z \\ j\neq l\end{array}}\frac{| K_j^T K_l|}{ \| K_j\|_2 \| K_l \|_2}\ $$
+%
+that should exhibit the lowest possible value; here $\smash{K_j}$ is the $j$-th column of ${\bf K}$. The underdetermined problem ${\bf K}{\bf C} = {\bf F} $ is then solved by $\smash{\ell_1}$ minimization: 
+%
+$$   {\bf C}^* =\arg\min_{{\boldsymbol h}\in \Rset^Z}\{\| {\bf h} \|_1;\;\| {\bf K}{\bf h} - {\bf F} \|_2 \leq \epsilon \}\,. $$
+%
+The method has been applied with $q=80$ as random sampling for the calculation of the $Z=165$ coefficients; see \fref{fg:DOE-CS}. The mutual coherence was found to be $\mcoherence=0.93$. The recovery of mean and variance with compressed sensing gPC was found to be satisfactory--see \tref{t:rae-tabcom}.
+%
+\begin{figure}
+\centering{\includegraphics[width=8cm]{\FIGS/Figures-RAE/CS-DoE80-3D}}
+\caption{The 80 sampling points used to compute the gPC coefficients of the polynomial surrogates of $\smash{\drag}$, $\smash{\lift}$ and $\smash{\moment}$ by compressed sensing}\label{fg:DOE-CS}
+\end{figure}
+
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{|c||c|c|}
+\hline
+ & \makebox[3em]{$\mu$} &  \makebox[3em]{$\sigma$} \\
+\hline\hline
+$\drag$ & 133.33e-04 & 34.052e-04 \\
+$\lift$ & 72.271e-02 & 1.6703e-02 \\
+$\moment$ & -453.95e-04 & 32.180e-04 \\
+\hline
+\end{tabular}
+\end{center}
+\caption{RAE2822: First two moments of the aerodynamic coefficients computed by compressed sensing (80 points)}
+\label{t:rae-tabcom}
+\end{table}
+%
+%************************************************************************************************
+\subsection{Free softwares}
+
+Several free softwares implementing the various techniques reviewed so far are available:
+\begin{itemize}
+\item\href{http://www.openturns.org}{OpenTURNS (www.openturns.org)} is jointly funded and developed by Airbus Group, EDF Research and Development, and Phimeca Engineering since 2005. IMACS joined the partnership in 2014, and \Onera\ in 2018;
+\item\href{https://www.uqlab.com}{UQLab (www.uqlab.com)} for \Matlab\ is developed by Prof. B. Sudret and Dr. S. Marelli at ETH Z\" urich since 2013;
+\item\href{https://www.sandia.gov/UQToolkit}{UQTk (www.sandia.gov/UQToolkit)} is developed at Sandia National Laboratories, Albuquerque NM, by Dr. B. Debusschere and his co-workers since 2005;
+\item\href{https://github.com/jonathf/chaospy}{ChaosPy (github.com/jonathf/chaospy)} is a \Python\ toolbox for performing uncertainty quantification via polynomial chaos expansions and Monte Carlo simulation developed at the University of Oslo \cite{FEI15};
+\item\href{https://www.tu-chemnitz.de/etit/control/research/PoCET/}{PoCET (www.tu-chemnitz.de/etit/control/research/PoCET)} is a free and open source toolbox for \Matlab\, featuring the automatic generation of gPC expansions for linear and nonlinear dynamical systems, developed at Technische Universit\"at Chemnitz \cite{PET20};
+\item\href{https://github.com/KTH-Nek5000/UQit}{UQit (github.com/KTH-Nek5000/UQit)} is a \Python\ open source package for uncertainty quantification in computational fluid dynamics, developed at KTH Royal Institute of Technology \cite{REZ21};
+\item\href{https://timueh.github.io/PolyChaos.jl/stable}{PolyChaos (timueh.github.io/PolyChaos.jl/stable)} is a collection of numerical routines for orthogonal polynomials written in Julia, which allows to compute gPC expansions of random variables if the weight function is a probability density function; it is developed at the Karlsruhe Institute of Technology \cite{MUH20};
+\item The computation of higher-order moments (such as the skewness of \eref{eq:skewness}) of output quantities of interest expanded on a polynomial chaos basis requires the computation of higher-order moments of orthonormal polynomials. \Matlab\ codes are available at \href{https://github.com/ericsavin/LinCoef}{https://github.com/ericsavin/LinCoef} for the classical families of continuous orthogonal polynomials, based on the analytical results outlined in \cite{SAV17}.
+\end{itemize}
+
+%
+%
+%************************************************************************************************
+\section{Conclusions}\label{sec:CL}
+%********************************Rcpa
+%
+Definitely, Uncertainty Quantification is needed today for robust analysis and robust design using Computational Fluid Dynamics. Unfortunately, there seems to be a lack of widely shared test problems based on inputs by aircraft industry that would be the counterpart of, for example, CRM for RANS steady-state simulation of external flows. 
+Besides (just as for global optimisation), the efficiency of UQ methods can not be compared only by standard benchmarks were each partner uses its CFD code and its favorite UQ method(s) (see conclusions of \sref{sec:FG5}). Tests on mathematical functions (possible stemming from actual real-life test cases) are needed to isolate the specific influence of UQ methods.
+   
+ At the end of the UMRIDA EU project (October 2016), many partners could achieve UQ satisfactory evaluations for 2D or 3D with 6 to 8 uncertain parameters. A great challenges consists in dealing with much larger number of uncertain parameters which will require analysis of input space (Sobol indices, active subspaces...) to remove inactive variables and exploitation of
+ ``sparsity of effects'' whenever observed (see \sref{sec:RAE2822}). Finally, moving towards large number of design parameters will include management of mesh deformation for possibly large number of uncertain geometrical parameters that is today a challenge. 
+%
+%
+%************************************************************************************************
+
+\section*{Acknowledgments}
+
+This work described in \sref{sec:RAE2822} has been supported by the European Union's Seventh Framework Programme for research, technological development and demonstration under grant agreement {\#}ACP3-GA-2013-605036 (UMRIDA project \href{http://www.umrida.eu}{www.umrida.eu}).
+
+%************************************************************************************************
+\bibliographystyle{nato-sto}
+
+%\bibliography{references} % when using a BibTeX database -- and you should!
+
+\begin{thebibliography}{99}
+
+\bibitem{CamHeiPlo_13}
+\href{\webDOI/10.1051/meca/2013056}{Cambier, L., Heib, S., Plot, S. The \elsA\ CFD software: input from research and feedback from industry. {\sl Mechanics \& Industry} {\bf 14}(3), 159-174 (2013)}.
+
+\bibitem{CAN08}
+\href{\webDOI/10.1109/MSP.2007.914731}{Cand\`es, E.J., Wakin, M.B. An introduction to compressive sampling. {\sl IEEE Sig. Proc. Mag.} {\bf 25}(2), 21-30 (2008)}.
+
+\bibitem{CleCur_60}
+\href{\webDOI/10.1007/BF01386223}{Clenshaw, C.W., Curtis, A.R. A method for numerical integration on an automatic computer. {\sl Numer. Math.} {\bf 2}(1), 197-205 (1960)}.
+
+\bibitem{CooMcDFir_79}
+\href{http://ftp.rta.nato.int/public/PubFullText/AGARD/AR/AGARD-AR-138/AGARD-AR-138.pdf}{Cook, P.H., McDonald, M.A., Firmin, M.C.P. Aerofoil RAE 2822. Pressure distributions,
+ and boundary layer and wake measurements. In {\sl Experimental Data Base for Computer Program Assessment}, AGARD Advisory Report No. 138, NATO, May 1979; Appendix A6 (1979)}.
+ 
+\bibitem{FEI15}
+\href{\webDOI/10.1016/j.jocs.2015.08.008}{Feinberg, J., Langtangen, H. P. Chaospy: An open source tool for designing methods of uncertainty quantification. {\sl J. Comput. Sci.} {\bf 11}, 46-57 (2015)}.
+
+\bibitem{GerGri_98}
+\href{\webDOI/10.1023/A:1019129717644}{Gerstner, T., Griebel, M. Numerical integration using sparse grids. {\sl Numer. Algorithms} {\bf 18}(3-4), 209-232 (1998)}.
+
+\bibitem{GhaSpa_91}
+\href{\webDOI/10.1007/978-1-4612-3094-6}{Ghanem, R., Spanos, P.D. {\sl Stochastic Finite Elements: A Spectral Approach}. Springer, New York NY (1991)}.
+
+\bibitem{Imh_63}
+\href{\webDOI/10.1007/BF01385885}{Imhof, J.P. On the method for numerical integration of Clenshaw and Curtis. {\sl Numer. Math.} {\bf 5}(1), 138-141 (1963)}.
+
+\bibitem{MUH20}
+\href{\webDOI/10.1016/j.ifacol.2020.12.552}{M\" uhlpfordt, T., Zahn, F., Hagenmeyer, V., Faulwasser, T. PolyChaos.jl -- A Julia package for polynomial chaos in systems and control. {\sl IFAC-PapersOnLine} {\bf 53}(2), 7210-7216 (2020)}.
+
+\bibitem{NobTemWeb_08}
+\href{\webDOI/10.1137/060663660}{Nobile, F., Tempone, R., Webster, G. A sparse grid stochastic collocation method for partial differential equations with random input data. {\sl SIAM J. Num. Anal.} {\bf 46}(5), 2309-2345 (2008)}.
+
+\bibitem{NovRit_97}
+\href{\webDOI/10.1007/978-3-0348-8871-4_15}{Novak, E., Ritter, K. The curse of dimension and a universal method for numerical integration. In {\sl Multivariate Approximation and Splines (N\"{u}rnberger, G., Schmidt, J.W., Walz, G., eds.)}, ISNM International Series of Numerical Mathematics {\bf 125}, pp 177--187. Birkh\"{a}user, Basel (1997)}.
+
+\bibitem{JPGoeGra_17}
+\href{\webDOI/10.2514/6.2017-1197}{Peter, J., Goertz, S., Graves, R. Three-parameter uncertainty quantification for generic missile FG5. AIAA Paper \#2017-1197 (2017)}.
+
+\bibitem{PET20}
+\href{\webDOI/10.1016/j.ifacol.2020.12.560}{Petzke, F., Mesbah, A., Streif, S. PoCET: a Polynomial Chaos Expansion toolbox for Matlab. {\sl IFAC-PapersOnLine} {\bf 53}(2), 7256-7261 (2020)}.
+
+\bibitem{REZ21}
+\href{\webDOI/10.21105/joss.02871}{Rezaeiravesh, S., Vinuesa, R., Schlatter, P. UQit: A Python package for uncertainty quantification (UQ) in computational fluid dynamics (CFD). {\sl J. Open Source Software} {\bf 6}(60), 2871 (2021)}.
+
+\bibitem{SavResJP_16}
+\href{\webDOI/10.2514/6.2016-0433}{Savin, \'E., Resmini, A., Peter, J. Sparse polynomial surrogates for aerodynamic computations with random inputs. AIAA Paper \#2016-0433 (2016)}.
+
+\bibitem{SAV17} 
+\href{\webDOI/10.1002/nme.5505}{Savin, \'E., Faverjon, B. Computation of higher-order moments of generalized polynomial chaos expansions. {\sl Int. J. Num. Methods Engng.} {\bf 111}(12), 1192-1200 (2017)}.
+
+\bibitem{Smo_63}
+\href{http://mi.mathnet.ru/eng/dan/v148/i5/p1042}{Smolyak, S.A. Quadrature and interpolation formulas for tensor products of certain classes of functions. {\sl Soviet Math. Dokl.} {\bf 4}, 240-243 (1963)}.
+
+\bibitem{Sob_01}
+\href{\webDOI/10.1016/S0378-4754(00)00270-6}{Sobol', I.M. Global sensitivity indices for non-linear mathematical models and their Monte-Carlo estimates. {\sl Math. Comput. Simulat.} {\bf 55}(1-3), 271-280 (2001)}.
+
+\bibitem{Wie_38}
+\href{\webDOI/10.2307/2371268}{Wiener, N. The homogeneous chaos. {\sl Amer. J. Math.} {\bf 60}(4), 897-936 (1938)}.
+
+\bibitem{XiuKar_02}
+\href{\webDOI/10.1137/S1064827501387826}{Xiu, D., Karniadakis, G.E. The Wiener--Askey polynomial chaos for stochastic differential equations. {\sl SIAM J. Sci. Comput.} {\bf 24}(2), 619-644 (2002)}.
+
+\end{thebibliography}
+
+
+
+%************************************************************************************************
+\end{document}
+
