@@ -1,6 +1,6 @@
 # A Short course on UQ for CFD
 
-Generalized polynomial chaos and stochastic collocation methods for uncertainty quantification in aerodynamics.
+A short course on generalized polynomial chaos and stochastic collocation methods for uncertainty quantification in aerodynamics.
 
 ## OUTLINE
 
